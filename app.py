@@ -127,6 +127,7 @@ IS_LOCAL_MODE = not Path(SANDBOX_CLI).exists()
 
 def get_bigquery_client() -> bigquery.Client:
     try:
+        # 1. Try Streamlit Secrets Service Account
         if "gcp_service_account" in st.secrets:
             secret_val = st.secrets["gcp_service_account"]
             creds_dict = json.loads(secret_val) if isinstance(secret_val, str) else dict(secret_val)
@@ -135,7 +136,16 @@ def get_bigquery_client() -> bigquery.Client:
     except Exception:
         pass
     
-    return bigquery.Client(project=GCP_PROJECT)
+    # 2. Try Standard ADC / Environment Variables
+    try:
+        return bigquery.Client(project=GCP_PROJECT)
+    except Exception as err:
+        raise RuntimeError(
+            "Could not authenticate with Google Cloud BigQuery. "
+            "Run 'gcloud auth application-default login' locally or provide 'gcp_service_account' in st.secrets."
+        ) from err
+
+
 
 def run_bigquery_sql(query: str) -> str:
     """Executes a SQL query against the BigQuery CRM table and returns results."""
