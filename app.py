@@ -106,12 +106,12 @@ with st.sidebar:
         st.session_state["messages"] = []
         st.rerun()
 
-# 3. Early state initialization (prevents AttributeError)
+# State Initialization
 if "messages" not in st.session_state:
     st.session_state["messages"] = [
         {
             "role": "assistant", 
-            "content": f"💼 **CRM Intelligence Agent Ready.** Connected to `{FULL_TABLE_PATH}` with multi-model auto-failover enabled. Ask me to run SQL aggregations, evaluate lead acquisition channels, or analyze CRM leads!"
+            "content": f"💼 **CRM Intelligence Agent Ready.** Connected to `{FULL_TABLE_PATH}` with active model auto-failover enabled. Ask me to run SQL aggregations, evaluate lead acquisition channels, or analyze CRM leads!"
         }
     ]
 
@@ -197,7 +197,6 @@ def get_runner(model_name: str, key_hash: str):
     adk_app = App(name=f"crm_bq_app_{model_name.replace('.', '_')}", root_agent=root_agent)
     return Runner(app=adk_app, session_service=InMemorySessionService(), auto_create_session=True)
 
-# Generate simple key hash for cache invalidation when API key changes
 key_hash = str(hash(api_key))
 
 # ==========================================
@@ -219,13 +218,12 @@ if prompt := st.chat_input("Ask CRM Assistant to analyze spend, find churn risks
     with st.chat_message("assistant", avatar="💼"):
         status_placeholder = st.empty()
         
-        # Resilient Model Fallback Ladder
+        # Updated Model Candidate Ladder
         models_to_try = [
+            "gemini-3.6-flash",
+            "gemini-3-flash",
             "gemini-2.5-flash",
-            "gemini-2.0-flash",
-            "gemini-1.5-flash",
-            "gemini-2.5-pro",
-            "gemini-1.5-pro"
+            "gemini-2.5-pro"
         ]
         
         final_response = None
@@ -233,46 +231,61 @@ if prompt := st.chat_input("Ask CRM Assistant to analyze spend, find churn risks
         for index, model_name in enumerate(models_to_try):
             status_placeholder.markdown(f"⏳ *Attempting request with model `{model_name}` ({index + 1}/{len(models_to_try)})...*")
             
-            try:
-                active_runner = get_runner(model_name, key_hash)
-                new_message = types.Content(parts=[types.Part(text=prompt)])
-                
-                events = active_runner.run(
-                    user_id="local_user",
-                    session_id="local_session",
-                    new_message=new_message
-                )
-                
-                final_response = "".join(
-                    part.text
-                    for event in events
-                    if event.content and event.content.parts
-                    for part in event.content.parts
-                    if part.text
-                )
-                
-                if final_response:
-                    status_placeholder.empty()
-                    break  # Success! Exit model ladder loop
+            # Retry loop for transient 503 capacity errors per model
+            max_retries = 2
+            for attempt in range(max_retries + 1):
+                try:
+                    active_runner = get_runner(model_name, key_hash)
+                    new_message = types.Content(parts=[types.Part(text=prompt)])
                     
-            except Exception as e:
-                err_str = str(e)
-                # If hit by Rate Limits (429), High Demand (503), or Deprecated Model (404), log & failover immediately to next model
-                if any(err in err_str for err in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE", "404", "NOT_FOUND"]):
-                    if index < len(models_to_try) - 1:
-                        status_placeholder.warning(
-                            f"⚠️ Model `{model_name}` hit limit or traffic spike. Failing over to `{models_to_try[index + 1]}`..."
-                        )
-                        time.sleep(1)
-                        continue
+                    events = active_runner.run(
+                        user_id="local_user",
+                        session_id="local_session",
+                        new_message=new_message
+                    )
+                    
+                    final_response = "".join(
+                        part.text
+                        for event in events
+                        if event.content and event.content.parts
+                        for part in event.content.parts
+                        if part.text
+                    )
+                    
+                    if final_response:
+                        status_placeholder.empty()
+                        break
+                        
+                except Exception as e:
+                    err_str = str(e)
+                    
+                    # Exponential Backoff for 503 Capacity Spikes
+                    if "503" in err_str or "UNAVAILABLE" in err_str:
+                        if attempt < max_retries:
+                            backoff_time = (2 ** attempt) + 1
+                            status_placeholder.info(f"⏳ High demand on `{model_name}` (503). Retrying in {backoff_time}s...")
+                            time.sleep(backoff_time)
+                            continue
+                    
+                    # Fallthrough failover for Rate Limit (429), Deprecated (404), or Exhausted 503s
+                    if any(err in err_str for err in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE", "404", "NOT_FOUND"]):
+                        if index < len(models_to_try) - 1:
+                            status_placeholder.warning(
+                                f"⚠️ Model `{model_name}` unavailable or rate-limited. Failing over to `{models_to_try[index + 1]}`..."
+                            )
+                            time.sleep(1)
+                            break  # Break inner retry loop to try next model in outer loop
+                        else:
+                            status_placeholder.empty()
+                            final_response = "⚠️ **All Models Exhausted:** All candidate models encountered rate limits or high traffic. Please try again shortly."
+                            break
                     else:
                         status_placeholder.empty()
-                        final_response = "⚠️ **All Models Exhausted:** All candidate models encountered rate limits or high traffic. Please try again in 15-30 seconds."
-                else:
-                    # Non-quota related execution errors
-                    status_placeholder.empty()
-                    final_response = f"⚠️ **Execution Error on `{model_name}`:** {err_str}"
-                    break
+                        final_response = f"⚠️ **Execution Error on `{model_name}`:** {err_str}"
+                        break
+            
+            if final_response:
+                break
 
         if not final_response:
             final_response = "Query executed successfully without text output."
