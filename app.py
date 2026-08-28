@@ -31,7 +31,6 @@ st.markdown("""
         background-color: #F8FAFC;
         color: #0F172A;
     }
-    
     section[data-testid="stSidebar"] {
         background-color: #1E293B;
         color: #F8FAFC;
@@ -42,7 +41,6 @@ st.markdown("""
     section[data-testid="stSidebar"] p {
         color: #F8FAFC !important;
     }
-
     .stChatMessage[data-testid="stChatMessage"]:nth-child(even) {
         background-color: #E2E8F0;
         border: 1px solid #CBD5E1;
@@ -51,7 +49,6 @@ st.markdown("""
         background-color: #FFFFFF;
         border: 1px solid #E2E8F0;
     }
-
     div.stButton > button:first-child {
         background-color: #2563EB;
         color: white;
@@ -94,14 +91,12 @@ with st.sidebar:
     st.markdown("---")
     st.header("💼 CRM BigQuery Monitor")
     
-    MODEL_ID = get_secret("GEMINI_MODEL", "gemini-3.6-flash")
     GCP_PROJECT = get_secret("GCP_PROJECT", os.environ.get("GCP_PROJECT", "notebooklm-491108"))
     DATASET_ID = get_secret("BQ_DATASET", os.environ.get("BQ_DATASET", "crm_data"))
     TABLE_ID = get_secret("BQ_TABLE", os.environ.get("BQ_TABLE", "leads"))
     
     FULL_TABLE_PATH = f"`{GCP_PROJECT}.{DATASET_ID}.{TABLE_ID}`"
 
-    st.markdown(f"**Model:** `{MODEL_ID}`")
     st.markdown(f"**GCP Project:** `{GCP_PROJECT}`")
     st.markdown(f"**BigQuery Table:** `{DATASET_ID}.{TABLE_ID}`")
     st.markdown(f"**Auth Source:** `{'User Key' if user_api_key else 'App Secret'}`")
@@ -116,7 +111,7 @@ if "messages" not in st.session_state:
     st.session_state["messages"] = [
         {
             "role": "assistant", 
-            "content": f"💼 **CRM Intelligence Agent Ready.** Connected to `{FULL_TABLE_PATH}` using `{MODEL_ID}`. Ask me to run SQL aggregations, evaluate lead acquisition channels, or extract sentiment from customer notes!"
+            "content": f"💼 **CRM Intelligence Agent Ready.** Connected to `{FULL_TABLE_PATH}` with multi-model auto-failover enabled. Ask me to run SQL aggregations, evaluate lead acquisition channels, or analyze CRM leads!"
         }
     ]
 
@@ -171,7 +166,7 @@ def execute_sandbox_command(command: str) -> str:
         return f"Sandbox Tool Error: {str(err)}"
 
 # ==========================================
-# 4. ADK AGENT INITIALIZATION
+# 4. ADK AGENT FACTORY (DYNAMIC MODEL BINDING)
 # ==========================================
 @st.cache_resource(show_spinner=False)
 def get_runner(model_name: str, key_hash: str):
@@ -199,15 +194,14 @@ def get_runner(model_name: str, key_hash: str):
         ]
     )
 
-    adk_app = App(name="crm_bq_sandbox_app", root_agent=root_agent)
+    adk_app = App(name=f"crm_bq_app_{model_name.replace('.', '_')}", root_agent=root_agent)
     return Runner(app=adk_app, session_service=InMemorySessionService(), auto_create_session=True)
 
-# Key hash binding ensures cache invalidation when key changes
+# Generate simple key hash for cache invalidation when API key changes
 key_hash = str(hash(api_key))
-runner = get_runner(MODEL_ID, key_hash)
 
 # ==========================================
-# 5. CHAT INTERFACE & AUTO-RETRY LOOP
+# 5. CHAT INTERFACE & RESILIENT MODEL LADDER
 # ==========================================
 
 # Render Existing History
@@ -224,15 +218,26 @@ if prompt := st.chat_input("Ask CRM Assistant to analyze spend, find churn risks
 
     with st.chat_message("assistant", avatar="💼"):
         status_placeholder = st.empty()
-        status_placeholder.markdown(f"⏳ *Processing request with `{MODEL_ID}`...*")
         
-        max_retries = 3
+        # Resilient Model Fallback Ladder
+        models_to_try = [
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash",
+            "gemini-2.5-pro",
+            "gemini-1.5-pro"
+        ]
+        
         final_response = None
         
-        for attempt in range(max_retries):
+        for index, model_name in enumerate(models_to_try):
+            status_placeholder.markdown(f"⏳ *Attempting request with model `{model_name}` ({index + 1}/{len(models_to_try)})...*")
+            
             try:
+                active_runner = get_runner(model_name, key_hash)
                 new_message = types.Content(parts=[types.Part(text=prompt)])
-                events = runner.run(
+                
+                events = active_runner.run(
                     user_id="local_user",
                     session_id="local_session",
                     new_message=new_message
@@ -244,26 +249,29 @@ if prompt := st.chat_input("Ask CRM Assistant to analyze spend, find churn risks
                     if event.content and event.content.parts
                     for part in event.content.parts
                     if part.text
-                ) or "Query executed successfully."
+                )
                 
-                status_placeholder.empty()
-                break
-                
+                if final_response:
+                    status_placeholder.empty()
+                    break  # Success! Exit model ladder loop
+                    
             except Exception as e:
                 err_str = str(e)
-                if ("429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "503" in err_str or "UNAVAILABLE" in err_str):
-                    if attempt < max_retries - 1:
-                        wait_seconds = 12
+                # If hit by Rate Limits (429), High Demand (503), or Deprecated Model (404), log & failover immediately to next model
+                if any(err in err_str for err in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE", "404", "NOT_FOUND"]):
+                    if index < len(models_to_try) - 1:
                         status_placeholder.warning(
-                            f"⚠️ **Rate Limit / High Demand:** Pausing {wait_seconds}s to reset quota (Attempt {attempt + 1}/{max_retries})..."
+                            f"⚠️ Model `{model_name}` hit limit or traffic spike. Failing over to `{models_to_try[index + 1]}`..."
                         )
-                        time.sleep(wait_seconds)
+                        time.sleep(1)
+                        continue
                     else:
                         status_placeholder.empty()
-                        final_response = "⚠️ **Quota Exceeded:** Hitting Google's per-minute free token limit. Please wait 15 seconds or enter your own Gemini API key in the sidebar."
+                        final_response = "⚠️ **All Models Exhausted:** All candidate models encountered rate limits or high traffic. Please try again in 15-30 seconds."
                 else:
+                    # Non-quota related execution errors
                     status_placeholder.empty()
-                    final_response = f"⚠️ **Execution Error:** {err_str}"
+                    final_response = f"⚠️ **Execution Error on `{model_name}`:** {err_str}"
                     break
 
         if not final_response:
