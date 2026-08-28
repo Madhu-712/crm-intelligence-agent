@@ -17,7 +17,7 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
 # ==========================================
-# PAGE CONFIGURATION & ENTERPRISE CRM THEMING
+# 1. PAGE CONFIGURATION & ENTERPRISE THEMING
 # ==========================================
 st.set_page_config(
     page_title="CRM Data & BigQuery Analytics",
@@ -66,7 +66,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# CONFIGURATION & CREDENTIAL RESOLUTION
+# 2. CONFIGURATION & CREDENTIAL RESOLUTION
 # ==========================================
 
 def get_secret(key: str, default=None):
@@ -75,7 +75,7 @@ def get_secret(key: str, default=None):
     except Exception:
         return default
 
-# Sidebar Credentials Input
+# Sidebar Credentials & Settings Input
 with st.sidebar:
     st.header("🔑 API Authentication")
     
@@ -83,7 +83,7 @@ with st.sidebar:
         "Gemini API Key (Optional)",
         type="password",
         placeholder="AIzaSy...",
-        help="Leave blank to use the shared app secret key. Get a key at https://aistudio.google.com/"
+        help="Leave blank to use default app secret key. Get a free key at https://aistudio.google.com/"
     )
     
     api_key = user_api_key.strip() or get_secret("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY", "")
@@ -108,15 +108,24 @@ with st.sidebar:
     
     st.markdown("---")
     if st.button("🗑️ Clear Chat History", use_container_width=True):
-        st.session_state.messages = []
+        st.session_state["messages"] = []
         st.rerun()
+
+# 3. Early state initialization (prevents AttributeError)
+if "messages" not in st.session_state:
+    st.session_state["messages"] = [
+        {
+            "role": "assistant", 
+            "content": f"💼 **CRM Intelligence Agent Ready.** Connected to `{FULL_TABLE_PATH}` using `{MODEL_ID}`. Ask me to run SQL aggregations, evaluate lead acquisition channels, or extract sentiment from customer notes!"
+        }
+    ]
 
 if not api_key:
     st.warning("⚠️ **Gemini API Key Required:** Please enter your Gemini API key in the sidebar or add `GEMINI_API_KEY` to Streamlit Secrets.")
     st.stop()
 
 # ==========================================
-# BIGQUERY & TOOL DEFINITIONS
+# 3. BIGQUERY & TOOL DEFINITIONS
 # ==========================================
 SANDBOX_CLI = '/usr/local/gcp/bin/sandbox'
 IS_LOCAL_MODE = not Path(SANDBOX_CLI).exists()
@@ -162,7 +171,7 @@ def execute_sandbox_command(command: str) -> str:
         return f"Sandbox Tool Error: {str(err)}"
 
 # ==========================================
-# ADK AGENT INITIALIZATION
+# 4. ADK AGENT INITIALIZATION
 # ==========================================
 @st.cache_resource(show_spinner=False)
 def get_runner(model_name: str, key_hash: str):
@@ -193,37 +202,29 @@ def get_runner(model_name: str, key_hash: str):
     adk_app = App(name="crm_bq_sandbox_app", root_agent=root_agent)
     return Runner(app=adk_app, session_service=InMemorySessionService(), auto_create_session=True)
 
-# Generate simple key hash for cache invalidation when API key changes
+# Key hash binding ensures cache invalidation when key changes
 key_hash = str(hash(api_key))
 runner = get_runner(MODEL_ID, key_hash)
 
 # ==========================================
-# STREAMLIT UI & CHAT INTERFACE WITH AUTO-RETRY
+# 5. CHAT INTERFACE & AUTO-RETRY LOOP
 # ==========================================
 
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {
-            "role": "assistant", 
-            "content": f"💼 **CRM Intelligence Agent Ready.** Connected to `{FULL_TABLE_PATH}` using `{MODEL_ID}`. Ask me to run SQL aggregations, evaluate lead acquisition channels, or extract sentiment from customer notes!"
-        }
-    ]
-
-# Render Message Stream
-for message in st.session_state.messages:
+# Render Existing History
+for message in st.session_state["messages"]:
     avatar = "💼" if message["role"] == "assistant" else "👤"
     with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
 
-# Chat Input Box
+# Chat Input Handler
 if prompt := st.chat_input("Ask CRM Assistant to analyze spend, find churn risks, or rank lead sources..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    st.session_state["messages"].append({"role": "user", "content": prompt})
     with st.chat_message("user", avatar="👤"):
         st.markdown(prompt)
 
     with st.chat_message("assistant", avatar="💼"):
         status_placeholder = st.empty()
-        status_placeholder.markdown("⏳ *Processing request with `gemini-3.6-flash`...*")
+        status_placeholder.markdown(f"⏳ *Processing request with `{MODEL_ID}`...*")
         
         max_retries = 3
         final_response = None
@@ -246,7 +247,7 @@ if prompt := st.chat_input("Ask CRM Assistant to analyze spend, find churn risks
                 ) or "Query executed successfully."
                 
                 status_placeholder.empty()
-                break  # Successful execution
+                break
                 
             except Exception as e:
                 err_str = str(e)
@@ -254,16 +255,19 @@ if prompt := st.chat_input("Ask CRM Assistant to analyze spend, find churn risks
                     if attempt < max_retries - 1:
                         wait_seconds = 12
                         status_placeholder.warning(
-                            f"⚠️ **Rate Limit / High Traffic Detected:** Pausing for {wait_seconds} seconds to reset quota. (Attempt {attempt + 1}/{max_retries})..."
+                            f"⚠️ **Rate Limit / High Demand:** Pausing {wait_seconds}s to reset quota (Attempt {attempt + 1}/{max_retries})..."
                         )
                         time.sleep(wait_seconds)
                     else:
                         status_placeholder.empty()
-                        final_response = "⚠️ **Quota Exceeded:** The API key hit Google's per-minute free token limit. Please wait 15 seconds or enter your own Gemini API key in the sidebar."
+                        final_response = "⚠️ **Quota Exceeded:** Hitting Google's per-minute free token limit. Please wait 15 seconds or enter your own Gemini API key in the sidebar."
                 else:
                     status_placeholder.empty()
                     final_response = f"⚠️ **Execution Error:** {err_str}"
                     break
 
+        if not final_response:
+            final_response = "Query executed successfully without text output."
+
         st.markdown(final_response)
-        st.session_state.messages.append({"role": "assistant", "content": final_response})
+        st.session_state["messages"].append({"role": "assistant", "content": final_response})
