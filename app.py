@@ -126,23 +126,25 @@ SANDBOX_CLI = '/usr/local/gcp/bin/sandbox'
 IS_LOCAL_MODE = not Path(SANDBOX_CLI).exists()
 
 def get_bigquery_client() -> bigquery.Client:
-    # 1. Check Streamlit Secrets first (for remote deployment)
+    # 1. Try loading explicitly from Streamlit Secrets (for deployed app)
     if "gcp_service_account" in st.secrets:
         try:
             secret_val = st.secrets["gcp_service_account"]
-            if isinstance(secret_val, str):
-                creds_dict = json.loads(secret_val)
-            else:
-                # Convert Streamlit AttrDict/dict to standard python dict
-                creds_dict = dict(secret_val)
-                
+            creds_dict = json.loads(secret_val) if isinstance(secret_val, str) else dict(secret_val)
             credentials = service_account.Credentials.from_service_account_info(creds_dict)
             return bigquery.Client(credentials=credentials, project=GCP_PROJECT)
         except Exception as e:
-            st.error(f"Failed loading service account from secrets: {e}")
+            st.error(f"Error parsing service account secrets: {e}")
 
-    # 2. Fall back to local ADC (for local development)
-    return bigquery.Client(project=GCP_PROJECT)
+    # 2. Try Standard Environment Variable (e.g., local dev or docker container)
+    if os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+        return bigquery.Client(project=GCP_PROJECT)
+
+    # 3. Explicitly fail with a helpful error rather than hanging on metadata service call
+    raise RuntimeError(
+        "GCP Credentials not found! The app cannot reach the Compute Engine metadata service. "
+        "Please add 'gcp_service_account' to your Streamlit secrets or set GOOGLE_APPLICATION_CREDENTIALS."
+    )
 
 
 
