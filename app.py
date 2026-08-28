@@ -1,3 +1,4 @@
+
 import os
 import json
 import subprocess
@@ -69,33 +70,44 @@ st.markdown("""
 # CONFIGURATION & CREDENTIAL RESOLUTION
 # ==========================================
 
-# 1. Resolve Gemini API Key (Streamlit Secrets -> Env Variable)
-if "GEMINI_API_KEY" in st.secrets:
-    os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]
+def get_secret(key: str, default=None):
+    try:
+        return st.secrets.get(key, default)
+    except Exception:
+        return default
 
-# 2. Resolve BigQuery Dataset & Project Parameters
-GCP_PROJECT = st.secrets.get("GCP_PROJECT", os.environ.get("GCP_PROJECT", "your-gcp-project-id"))
-DATASET_ID = st.secrets.get("BQ_DATASET", os.environ.get("BQ_DATASET", "crm_data"))
-TABLE_ID = st.secrets.get("BQ_TABLE", os.environ.get("BQ_TABLE", "leads"))
+# 1. Resolve Gemini API Key
+api_key = get_secret("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+if api_key:
+    os.environ["GEMINI_API_KEY"] = api_key
+
+# 2. Resolve Model Identifier (Defaults explicitly to gemini-3.6-flash)
+MODEL_ID = get_secret("GEMINI_MODEL", "gemini-3.6-flash")
+
+# 3. Resolve BigQuery Parameters
+GCP_PROJECT = get_secret("GCP_PROJECT", os.environ.get("GCP_PROJECT", "notebooklm-491108"))
+DATASET_ID = get_secret("BQ_DATASET", os.environ.get("BQ_DATASET", "crm_data"))
+TABLE_ID = get_secret("BQ_TABLE", os.environ.get("BQ_TABLE", "leads"))
 
 FULL_TABLE_PATH = f"`{GCP_PROJECT}.{DATASET_ID}.{TABLE_ID}`"
 
-# 3. Sandbox execution check
+# 4. Sandbox execution check
 SANDBOX_CLI = '/usr/local/gcp/bin/sandbox'
 IS_LOCAL_MODE = not Path(SANDBOX_CLI).exists()
 
 
 def get_bigquery_client() -> bigquery.Client:
-    """Initializes BigQuery client using Streamlit Secrets (Service Account) or default environment credentials."""
-    if "gcp_service_account" in st.secrets:
-        # Load from Streamlit Community Cloud Secrets
-        secret_val = st.secrets["gcp_service_account"]
-        creds_dict = json.loads(secret_val) if isinstance(secret_val, str) else dict(secret_val)
-        credentials = service_account.Credentials.from_service_account_info(creds_dict)
-        return bigquery.Client(credentials=credentials, project=GCP_PROJECT)
-    else:
-        # Fallback to local / Cloud Shell default application credentials
-        return bigquery.Client(project=GCP_PROJECT)
+    """Initializes BigQuery client using Streamlit Secrets or default ADC credentials."""
+    try:
+        if "gcp_service_account" in st.secrets:
+            secret_val = st.secrets["gcp_service_account"]
+            creds_dict = json.loads(secret_val) if isinstance(secret_val, str) else dict(secret_val)
+            credentials = service_account.Credentials.from_service_account_info(creds_dict)
+            return bigquery.Client(credentials=credentials, project=GCP_PROJECT)
+    except Exception:
+        pass
+    
+    return bigquery.Client(project=GCP_PROJECT)
 
 
 def run_bigquery_sql(query: str) -> str:
@@ -131,12 +143,12 @@ def execute_sandbox_command(command: str) -> str:
 # ==========================================
 # ADK AGENT & RUNNER INITIALIZATION
 # ==========================================
-@st.cache_resource
-def initialize_runner():
+@st.cache_resource(show_spinner=False)
+def get_runner(model_name: str):
     root_agent = Agent(
         name='crm_bigquery_assistant',
         description='ADK agent capable of querying BigQuery datasets and running python scripts to analyze CRM records.',
-        model=os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash'),
+        model=model_name,
         instruction=(
             f'You are an expert AI CRM Strategy Analyst.\n'
             f'You have access to a BigQuery table containing CRM leads at path: {FULL_TABLE_PATH}.\n\n'
@@ -160,7 +172,8 @@ def initialize_runner():
     adk_app = App(name="crm_bq_sandbox_app", root_agent=root_agent)
     return Runner(app=adk_app, session_service=InMemorySessionService(), auto_create_session=True)
 
-runner = initialize_runner()
+# Explicit parameter binding forces cache invalidation when model changes
+runner = get_runner(MODEL_ID)
 
 # ==========================================
 # STREAMLIT UI & CHAT INTERFACE
@@ -171,9 +184,9 @@ with st.sidebar:
     st.header("💼 CRM BigQuery Monitor")
     st.markdown("---")
     st.markdown("**Status:** Active")
+    st.markdown(f"**Model:** `{MODEL_ID}`")
     st.markdown(f"**GCP Project:** `{GCP_PROJECT}`")
     st.markdown(f"**BigQuery Table:** `{DATASET_ID}.{TABLE_ID}`")
-    st.markdown(f"**Auth Method:** `{'Service Account Secret' if 'gcp_service_account' in st.secrets else 'Default ADC'}`")
     
     st.markdown("---")
     st.caption("Table Schema:")
@@ -188,7 +201,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = [
         {
             "role": "assistant", 
-            "content": f"💼 **CRM Intelligence Agent Ready.** Connected to `{FULL_TABLE_PATH}`. Ask me to run SQL aggregations, evaluate lead acquisition channels, or extract sentiment from customer notes!"
+            "content": f"💼 **CRM Intelligence Agent Ready.** Connected to `{FULL_TABLE_PATH}` using model `{MODEL_ID}`. Ask me to run SQL aggregations, evaluate lead acquisition channels, or extract sentiment from customer notes!"
         }
     ]
 
