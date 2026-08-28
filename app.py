@@ -126,24 +126,25 @@ SANDBOX_CLI = '/usr/local/gcp/bin/sandbox'
 IS_LOCAL_MODE = not Path(SANDBOX_CLI).exists()
 
 def get_bigquery_client() -> bigquery.Client:
-    try:
-        # 1. Try Streamlit Secrets Service Account
-        if "gcp_service_account" in st.secrets:
+    # 1. Check Streamlit Secrets first (for remote deployment)
+    if "gcp_service_account" in st.secrets:
+        try:
             secret_val = st.secrets["gcp_service_account"]
-            creds_dict = json.loads(secret_val) if isinstance(secret_val, str) else dict(secret_val)
+            if isinstance(secret_val, str):
+                creds_dict = json.loads(secret_val)
+            else:
+                # Convert Streamlit AttrDict/dict to standard python dict
+                creds_dict = dict(secret_val)
+                
             credentials = service_account.Credentials.from_service_account_info(creds_dict)
             return bigquery.Client(credentials=credentials, project=GCP_PROJECT)
-    except Exception:
-        pass
-    
-    # 2. Try Standard ADC / Environment Variables
-    try:
-        return bigquery.Client(project=GCP_PROJECT)
-    except Exception as err:
-        raise RuntimeError(
-            "Could not authenticate with Google Cloud BigQuery. "
-            "Run 'gcloud auth application-default login' locally or provide 'gcp_service_account' in st.secrets."
-        ) from err
+        except Exception as e:
+            st.error(f"Failed loading service account from secrets: {e}")
+
+    # 2. Fall back to local ADC (for local development)
+    return bigquery.Client(project=GCP_PROJECT)
+
+
 
 
 
