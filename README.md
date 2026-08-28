@@ -1,6 +1,6 @@
 # 💼 CRM Intelligence Agent
 
-An AI-driven CRM analytics assistant built for hackathons that enables sales teams and managers to query customer records, analyze acquisition channels, and extract sentiment from interaction notes using natural language—all running on a **100% credit-card-free Google Cloud and Gemini stack**.
+An AI-driven CRM analytics assistant built for hackathons that enables sales teams and managers to query customer records, analyze acquisition channels, and extract sentiment from interaction notes using natural language—all running on a ** Google Cloud and Gemini stack**.
 
 ---
 
