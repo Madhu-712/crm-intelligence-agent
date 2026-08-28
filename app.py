@@ -1,6 +1,6 @@
-
 import os
 import json
+import time
 import subprocess
 from pathlib import Path
 from typing import List
@@ -25,7 +25,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Enterprise Navy & Slate Custom CSS
 st.markdown("""
 <style>
     .stApp {
@@ -76,28 +75,53 @@ def get_secret(key: str, default=None):
     except Exception:
         return default
 
-# 1. Resolve Gemini API Key
-api_key = get_secret("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
-if api_key:
-    os.environ["GEMINI_API_KEY"] = api_key
+# Sidebar Credentials Input
+with st.sidebar:
+    st.header("🔑 API Authentication")
+    
+    user_api_key = st.text_input(
+        "Gemini API Key (Optional)",
+        type="password",
+        placeholder="AIzaSy...",
+        help="Leave blank to use the shared app secret key. Get a key at https://aistudio.google.com/"
+    )
+    
+    api_key = user_api_key.strip() or get_secret("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY", "")
+    
+    if api_key:
+        os.environ["GEMINI_API_KEY"] = api_key
+    
+    st.markdown("---")
+    st.header("💼 CRM BigQuery Monitor")
+    
+    MODEL_ID = get_secret("GEMINI_MODEL", "gemini-3.6-flash")
+    GCP_PROJECT = get_secret("GCP_PROJECT", os.environ.get("GCP_PROJECT", "notebooklm-491108"))
+    DATASET_ID = get_secret("BQ_DATASET", os.environ.get("BQ_DATASET", "crm_data"))
+    TABLE_ID = get_secret("BQ_TABLE", os.environ.get("BQ_TABLE", "leads"))
+    
+    FULL_TABLE_PATH = f"`{GCP_PROJECT}.{DATASET_ID}.{TABLE_ID}`"
 
-# 2. Resolve Model Identifier (Defaults explicitly to gemini-3.6-flash)
-MODEL_ID = get_secret("GEMINI_MODEL", "gemini-3.6-flash")
+    st.markdown(f"**Model:** `{MODEL_ID}`")
+    st.markdown(f"**GCP Project:** `{GCP_PROJECT}`")
+    st.markdown(f"**BigQuery Table:** `{DATASET_ID}.{TABLE_ID}`")
+    st.markdown(f"**Auth Source:** `{'User Key' if user_api_key else 'App Secret'}`")
+    
+    st.markdown("---")
+    if st.button("🗑️ Clear Chat History", use_container_width=True):
+        st.session_state.messages = []
+        st.rerun()
 
-# 3. Resolve BigQuery Parameters
-GCP_PROJECT = get_secret("GCP_PROJECT", os.environ.get("GCP_PROJECT", "notebooklm-491108"))
-DATASET_ID = get_secret("BQ_DATASET", os.environ.get("BQ_DATASET", "crm_data"))
-TABLE_ID = get_secret("BQ_TABLE", os.environ.get("BQ_TABLE", "leads"))
+if not api_key:
+    st.warning("⚠️ **Gemini API Key Required:** Please enter your Gemini API key in the sidebar or add `GEMINI_API_KEY` to Streamlit Secrets.")
+    st.stop()
 
-FULL_TABLE_PATH = f"`{GCP_PROJECT}.{DATASET_ID}.{TABLE_ID}`"
-
-# 4. Sandbox execution check
+# ==========================================
+# BIGQUERY & TOOL DEFINITIONS
+# ==========================================
 SANDBOX_CLI = '/usr/local/gcp/bin/sandbox'
 IS_LOCAL_MODE = not Path(SANDBOX_CLI).exists()
 
-
 def get_bigquery_client() -> bigquery.Client:
-    """Initializes BigQuery client using Streamlit Secrets or default ADC credentials."""
     try:
         if "gcp_service_account" in st.secrets:
             secret_val = st.secrets["gcp_service_account"]
@@ -109,9 +133,8 @@ def get_bigquery_client() -> bigquery.Client:
     
     return bigquery.Client(project=GCP_PROJECT)
 
-
 def run_bigquery_sql(query: str) -> str:
-    """Executes a SQL query against the BigQuery CRM table and returns the results formatted as text."""
+    """Executes a SQL query against the BigQuery CRM table and returns results."""
     try:
         client = get_bigquery_client()
         query_job = client.query(query)
@@ -124,11 +147,9 @@ def run_bigquery_sql(query: str) -> str:
     except Exception as e:
         return f"BigQuery Execution Error: {str(e)}"
 
-
 def run_sandbox_process(args: list[str]):
     cmd = args[2:] if IS_LOCAL_MODE and args[:2] == ['do', '--'] else ([SANDBOX_CLI] + args if not IS_LOCAL_MODE else args)
     return subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-
 
 def execute_sandbox_command(command: str) -> str:
     """Executes shell commands in local environment or sandbox container."""
@@ -141,10 +162,10 @@ def execute_sandbox_command(command: str) -> str:
         return f"Sandbox Tool Error: {str(err)}"
 
 # ==========================================
-# ADK AGENT & RUNNER INITIALIZATION
+# ADK AGENT INITIALIZATION
 # ==========================================
 @st.cache_resource(show_spinner=False)
-def get_runner(model_name: str):
+def get_runner(model_name: str, key_hash: str):
     root_agent = Agent(
         name='crm_bigquery_assistant',
         description='ADK agent capable of querying BigQuery datasets and running python scripts to analyze CRM records.',
@@ -172,36 +193,19 @@ def get_runner(model_name: str):
     adk_app = App(name="crm_bq_sandbox_app", root_agent=root_agent)
     return Runner(app=adk_app, session_service=InMemorySessionService(), auto_create_session=True)
 
-# Explicit parameter binding forces cache invalidation when model changes
-runner = get_runner(MODEL_ID)
+# Generate simple key hash for cache invalidation when API key changes
+key_hash = str(hash(api_key))
+runner = get_runner(MODEL_ID, key_hash)
 
 # ==========================================
-# STREAMLIT UI & CHAT INTERFACE
+# STREAMLIT UI & CHAT INTERFACE WITH AUTO-RETRY
 # ==========================================
 
-# Sidebar Dashboard
-with st.sidebar:
-    st.header("💼 CRM BigQuery Monitor")
-    st.markdown("---")
-    st.markdown("**Status:** Active")
-    st.markdown(f"**Model:** `{MODEL_ID}`")
-    st.markdown(f"**GCP Project:** `{GCP_PROJECT}`")
-    st.markdown(f"**BigQuery Table:** `{DATASET_ID}.{TABLE_ID}`")
-    
-    st.markdown("---")
-    st.caption("Table Schema:")
-    st.code(
-        "CustomerID, FirstName, LastName, Email, Phone, Address, City, State, "
-        "ZipCode, Country, SignupDate, LastPurchaseDate, TotalSpent, LeadSource, Notes",
-        language="text"
-    )
-
-# Session Chat History
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
             "role": "assistant", 
-            "content": f"💼 **CRM Intelligence Agent Ready.** Connected to `{FULL_TABLE_PATH}` using model `{MODEL_ID}`. Ask me to run SQL aggregations, evaluate lead acquisition channels, or extract sentiment from customer notes!"
+            "content": f"💼 **CRM Intelligence Agent Ready.** Connected to `{FULL_TABLE_PATH}` using `{MODEL_ID}`. Ask me to run SQL aggregations, evaluate lead acquisition channels, or extract sentiment from customer notes!"
         }
     ]
 
@@ -218,7 +222,13 @@ if prompt := st.chat_input("Ask CRM Assistant to analyze spend, find churn risks
         st.markdown(prompt)
 
     with st.chat_message("assistant", avatar="💼"):
-        with st.spinner("Processing request and running BigQuery SQL..."):
+        status_placeholder = st.empty()
+        status_placeholder.markdown("⏳ *Processing request with `gemini-3.6-flash`...*")
+        
+        max_retries = 3
+        final_response = None
+        
+        for attempt in range(max_retries):
             try:
                 new_message = types.Content(parts=[types.Part(text=prompt)])
                 events = runner.run(
@@ -233,12 +243,27 @@ if prompt := st.chat_input("Ask CRM Assistant to analyze spend, find churn risks
                     if event.content and event.content.parts
                     for part in event.content.parts
                     if part.text
-                ) or "Query executed successfully without text output."
+                ) or "Query executed successfully."
                 
-                st.markdown(final_response)
-                st.session_state.messages.append({"role": "assistant", "content": final_response})
+                status_placeholder.empty()
+                break  # Successful execution
                 
             except Exception as e:
-                error_msg = f"⚠️ **Execution Error:** {str(e)}"
-                st.error(error_msg)
-                st.session_state.messages.append({"role": "assistant", "content": error_msg})
+                err_str = str(e)
+                if ("429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "503" in err_str or "UNAVAILABLE" in err_str):
+                    if attempt < max_retries - 1:
+                        wait_seconds = 12
+                        status_placeholder.warning(
+                            f"⚠️ **Rate Limit / High Traffic Detected:** Pausing for {wait_seconds} seconds to reset quota. (Attempt {attempt + 1}/{max_retries})..."
+                        )
+                        time.sleep(wait_seconds)
+                    else:
+                        status_placeholder.empty()
+                        final_response = "⚠️ **Quota Exceeded:** The API key hit Google's per-minute free token limit. Please wait 15 seconds or enter your own Gemini API key in the sidebar."
+                else:
+                    status_placeholder.empty()
+                    final_response = f"⚠️ **Execution Error:** {err_str}"
+                    break
+
+        st.markdown(final_response)
+        st.session_state.messages.append({"role": "assistant", "content": final_response})
