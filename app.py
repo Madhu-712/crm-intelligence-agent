@@ -82,7 +82,7 @@ if api_key:
     os.environ["GEMINI_API_KEY"] = api_key
 
 # 2. Resolve Model Identifier (Defaults explicitly to gemini-3.6-flash)
-MODEL_ID = get_secret("GEMINI_MODEL", "gemini-2.0-flash")
+MODEL_ID = get_secret("GEMINI_MODEL", "gemini-3.6-flash")
 
 # 3. Resolve BigQuery Parameters
 GCP_PROJECT = get_secret("GCP_PROJECT", os.environ.get("GCP_PROJECT", "notebooklm-491108"))
