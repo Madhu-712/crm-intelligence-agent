@@ -15,7 +15,7 @@ from typing import List, Dict, Any, Optional
 import streamlit as st
 import pandas as pd
 
-# Safe SDK imports
+# Attempt to load BigQuery & Google SDKs safely
 try:
     from google.cloud import bigquery
     from google.oauth2 import service_account
@@ -41,7 +41,7 @@ except ImportError:
     ADK_AVAILABLE = False
 
 # ==============================================================================
-# 1. PAGE CONFIGURATION & HIGH-CONTRAST STREAMLIT THEME
+# 1. PAGE CONFIGURATION & ENTERPRISE HIGH-CONTRAST THEME
 # ==============================================================================
 st.set_page_config(
     page_title="CRM Data & BigQuery Analytics Agent",
@@ -50,64 +50,74 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# High-contrast CSS ensuring all inputs, textareas, chat bubbles, and labels are 100% visible
 st.markdown("""
 <style>
-    /* Global Container */
+    /* Dark Canvas Baseline */
     .stApp {
-        background-color: #0F172A;
-        color: #F8FAFC;
-    }
-    
-    /* Ensure all text labels and headings are crisp white/slate-200 */
-    label, .stMarkdown, p, span, h1, h2, h3, h4, h5, h6 {
+        background-color: #0B1120;
         color: #F8FAFC !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
-    
-    /* Sidebar Styling */
-    section[data-testid="stSidebar"] {
-        background-color: #0B1120 !important;
-        border-right: 1px solid #1E293B;
-    }
-    section[data-testid="stSidebar"] * {
-        color: #F1F5F9 !important;
-    }
-    
-    /* Input Fields, Text Areas & Select Boxes - High Contrast & Visible */
-    div[data-baseweb="input"], div[data-baseweb="textarea"], div[data-baseweb="select"] {
-        background-color: #1E293B !important;
-        border: 1px solid #475569 !important;
-        border-radius: 8px !important;
-    }
-    input, textarea {
+
+    /* Universal Label and Text Visibility */
+    label, .stMarkdown, p, span, h1, h2, h3, h4, h5, h6, .stSelectbox label, .stTextInput label, .stTextArea label {
         color: #FFFFFF !important;
-        background-color: transparent !important;
-        font-size: 0.95rem !important;
+        font-weight: 500 !important;
     }
+    
+    /* Input Fields & Textareas - Clear white typed text & solid dark slate background */
+    input, textarea, select {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+        background-color: #1E293B !important;
+        font-size: 0.95rem !important;
+        opacity: 1 !important;
+        caret-color: #38BDF8 !important;
+    }
+
     input::placeholder, textarea::placeholder {
         color: #94A3B8 !important;
+        -webkit-text-fill-color: #94A3B8 !important;
+        opacity: 1 !important;
     }
-    
-    /* Chat Input Bar - Explicit Visibility */
+
+    div[data-baseweb="input"], div[data-baseweb="textarea"], div[data-baseweb="select"] {
+        background-color: #1E293B !important;
+        border: 2px solid #475569 !important;
+        border-radius: 8px !important;
+    }
+
+    div[data-baseweb="input"]:focus-within, div[data-baseweb="textarea"]:focus-within {
+        border-color: #38BDF8 !important;
+    }
+
+    /* Streamlit Chat Input - Highlighted Active Bar */
     div[data-testid="stChatInput"] {
         background-color: #1E293B !important;
-        border: 1px solid #3B82F6 !important;
+        border: 2px solid #3B82F6 !important;
         border-radius: 12px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
     }
+
     div[data-testid="stChatInput"] textarea {
         color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+        background-color: transparent !important;
+    }
+
+    /* Selectbox dropdowns */
+    div[data-baseweb="select"] * {
+        color: #FFFFFF !important;
+        background-color: #1E293B !important;
     }
     
-    /* Chat Message Bubbles */
-    div[data-testid="stChatMessage"] {
-        background-color: #1E293B !important;
-        border: 1px solid #334155 !important;
-        border-radius: 12px !important;
-        padding: 14px 18px !important;
-        margin-bottom: 12px !important;
-    }
-    div[data-testid="stChatMessage"] p, div[data-testid="stChatMessage"] span, div[data-testid="stChatMessage"] li {
-        color: #F8FAFC !important;
+    /* Header Card */
+    .hero-banner {
+        background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 20px;
     }
     
     /* Metric Cards */
@@ -116,39 +126,66 @@ st.markdown("""
         border: 1px solid #334155;
         border-radius: 10px;
         padding: 16px 18px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.25);
     }
     .metric-title {
         font-size: 0.75rem;
-        color: #94A3B8 !important;
+        color: #94A3B8;
         text-transform: uppercase;
         letter-spacing: 0.06em;
         margin-bottom: 4px;
         font-weight: 600;
     }
     .metric-value {
-        font-size: 1.6rem;
+        font-size: 1.55rem;
         font-weight: 700;
-        color: #F8FAFC !important;
+        color: #F8FAFC;
     }
     .metric-badge {
         display: inline-flex;
         align-items: center;
+        gap: 4px;
         font-size: 0.72rem;
         padding: 2px 8px;
         border-radius: 9999px;
         font-weight: 600;
         margin-top: 6px;
     }
-    .badge-green { background: rgba(16, 185, 129, 0.2); color: #34D399 !important; border: 1px solid rgba(16, 185, 129, 0.4); }
-    .badge-red { background: rgba(239, 68, 68, 0.2); color: #F87171 !important; border: 1px solid rgba(239, 68, 68, 0.4); }
-    .badge-blue { background: rgba(59, 130, 246, 0.2); color: #60A5FA !important; border: 1px solid rgba(59, 130, 246, 0.4); }
-    .badge-purple { background: rgba(168, 85, 247, 0.2); color: #C084FC !important; border: 1px solid rgba(168, 85, 247, 0.4); }
+    .badge-green { background: rgba(16, 185, 129, 0.15); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-red { background: rgba(239, 68, 68, 0.15); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .badge-blue { background: rgba(59, 130, 246, 0.15); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3); }
+    .badge-purple { background: rgba(168, 85, 247, 0.15); color: #C084FC; border: 1px solid rgba(168, 85, 247, 0.3); }
+    
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background-color: #0F172A;
+        border-right: 1px solid #1E293B;
+    }
+    section[data-testid="stSidebar"] h1, 
+    section[data-testid="stSidebar"] h2, 
+    section[data-testid="stSidebar"] h3 {
+        color: #F8FAFC !important;
+    }
+    
+    /* Chat Bubbles */
+    .stChatMessage[data-testid="stChatMessage"] {
+        background-color: #1E293B !important;
+        border: 1px solid #334155 !important;
+        border-radius: 12px !important;
+        margin-bottom: 12px;
+    }
+    
+    /* Dataframe wrapper */
+    div[data-testid="stDataFrame"] {
+        border: 1px solid #334155;
+        border-radius: 8px;
+        overflow: hidden;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. COMPLETE CRM DATASET (20 ENTERPRISE LEADS)
+# 2. COMPLETE ENTERPRISE CRM DATASET (STANDALONE + BIGQUERY SYNC)
 # ==============================================================================
 RAW_CRM_LEADS = [
     {"CustomerID": 1001, "FirstName": "Eleanor", "LastName": "Vance", "Email": "eleanor.vance@apexglobal.com", "Phone": "+1-415-555-0192", "Address": "742 Montgomery St", "City": "San Francisco", "State": "CA", "ZipCode": "94111", "Country": "USA", "SignupDate": "2023-01-15", "LastPurchaseDate": "2024-02-10", "TotalSpent": 48500.00, "LeadSource": "Organic Search", "Notes": "Enterprise tier customer. Expressed interest in migrating 500 additional seats in Q3. Highly satisfied with API uptime."},
@@ -176,7 +213,7 @@ RAW_CRM_LEADS = [
 df_crm = pd.DataFrame(RAW_CRM_LEADS)
 
 # ==============================================================================
-# 3. SECRETS & CONFIGURATION RESOLUTION
+# 3. CONFIGURATION & CREDENTIAL RESOLUTION
 # ==============================================================================
 def get_secret(key: str, default: Any = None) -> Any:
     try:
@@ -184,6 +221,7 @@ def get_secret(key: str, default: Any = None) -> Any:
     except Exception:
         return default
 
+# Sidebar Controls
 with st.sidebar:
     st.markdown("### 🔑 API Authentication")
     user_api_key = st.text_input(
@@ -206,7 +244,7 @@ with st.sidebar:
 
     st.markdown(f"**GCP Project:** `{GCP_PROJECT}`")
     st.markdown(f"**Dataset Table:** `{DATASET_ID}.{TABLE_ID}`")
-    st.markdown(f"**Status:** `🟢 Active ({len(df_crm)} leads)`")
+    st.markdown(f"**Status:** `🟢 Connected (20 records)`")
 
     st.markdown("---")
     st.markdown("### ⚡ Quick Starters")
@@ -249,13 +287,13 @@ def get_bigquery_client() -> Optional[bigquery.Client]:
     return None
 
 def run_bigquery_sql(query: str) -> str:
-    """Executes a SQL query against BigQuery or local dataframe engine and returns JSON string."""
+    """Executes a SQL query against BigQuery (or local dataframe emulator) and returns results."""
     try:
         client = get_bigquery_client()
         if client:
             query_job = client.query(query)
             results = [dict(row) for row in query_job.result()]
-            return json.dumps(results) if results else "[]"
+            return str(results) if results else "Query executed successfully, returned 0 rows."
     except Exception:
         pass
 
@@ -295,13 +333,14 @@ def run_bigquery_sql(query: str) -> str:
 
         return df_crm.head(10).to_json(orient="records")
     except Exception as e:
-        return json.dumps([{"error": str(e)}])
+        return f"SQL Sandbox Execution Error: {str(e)}"
 
 def run_sandbox_process(args: list[str]):
     cmd = args[2:] if IS_LOCAL_MODE and args[:2] == ['do', '--'] else ([SANDBOX_CLI] + args if not IS_LOCAL_MODE else args)
     return subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
 def execute_sandbox_command(command: str) -> str:
+    """Executes shell commands in local environment or sandbox container."""
     try:
         res = run_sandbox_process(['do', '--', '/bin/sh', '-c', command])
         if res.returncode != 0:
@@ -311,7 +350,7 @@ def execute_sandbox_command(command: str) -> str:
         return f"Sandbox Tool Error: {str(err)}"
 
 # ==============================================================================
-# 5. MULTI-MODEL ADK & GENAI AGENT RUNNER
+# 5. MULTI-MODEL ADK & GENAI AGENT RUNNER WITH MODEL FAILOVER
 # ==============================================================================
 def execute_agent_chat(prompt: str, history: List[Dict[str, str]]) -> str:
     models_to_try = [
@@ -320,6 +359,7 @@ def execute_agent_chat(prompt: str, history: List[Dict[str, str]]) -> str:
         "gemini-3.1-pro-preview"
     ]
     
+    # 1. Try ADK Agent runner if available
     if ADK_AVAILABLE and api_key:
         for model_name in models_to_try:
             try:
@@ -357,6 +397,7 @@ def execute_agent_chat(prompt: str, history: List[Dict[str, str]]) -> str:
             except Exception:
                 continue
 
+    # 2. Try direct Google GenAI SDK if ADK is bypassed
     if GENAI_LIB_AVAILABLE and api_key:
         client = genai.Client(api_key=api_key)
         system_instruction = f"""
@@ -385,6 +426,7 @@ Guidelines:
             except Exception:
                 continue
 
+    # 3. Resilient Local Rule Engine fallback
     p_lower = prompt.lower()
     if "churn" in p_lower or "risk" in p_lower:
         churn_df = df_crm[df_crm["Notes"].str.contains("churn|risk|cancellation", case=False, na=False)]
@@ -415,14 +457,17 @@ Identified **{len(churn_df)} accounts** with explicit churn indicators in sales 
 
 {top_df[['CustomerID', 'FirstName', 'LastName', 'Country', 'TotalSpent', 'LeadSource', 'Notes']].to_markdown(index=False)}
 
-*Connected to `{FULL_TABLE_PATH}`. Configure `GEMINI_API_KEY` in the sidebar for autonomous natural language query synthesis.*"""
+*Connected to `{FULL_TABLE_PATH}`. Configure `GEMINI_API_KEY` for autonomous natural language query synthesis.*"""
 
 # ==============================================================================
 # 6. ENHANCED DASHBOARD & APPLICATION TABS
 # ==============================================================================
-st.title("💼 CRM Data & BigQuery Analytics Agent")
-st.caption(f"Enterprise CRM Intelligence & SQL Analytics connected to `{FULL_TABLE_PATH}`")
 
+# Header Section
+st.title("💼 CRM Data & BigQuery Analytics Agent")
+st.caption(f"Enterprise Analytics & Autonomous Gemini Intelligence connected to `{FULL_TABLE_PATH}`")
+
+# 4 Main Tabs
 tabs = st.tabs([
     "📊 Executive Dashboard", 
     "💬 AI Assistant", 
@@ -431,9 +476,10 @@ tabs = st.tabs([
 ])
 
 # ------------------------------------------------------------------------------
-# TAB 1: EXECUTIVE CRM DASHBOARD
+# TAB 1: ENHANCED EXECUTIVE CRM DASHBOARD
 # ------------------------------------------------------------------------------
 with tabs[0]:
+    # Top KPI Metrics Cards
     total_leads = len(df_crm)
     total_revenue = df_crm["TotalSpent"].sum()
     avg_clv = df_crm["TotalSpent"].mean()
@@ -475,7 +521,9 @@ with tabs[0]:
 
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
+    # Visual Charts Breakdown
     chart_col1, chart_col2 = st.columns(2)
+    
     with chart_col1:
         st.subheader("📈 Revenue by Acquisition Channel ($)")
         channel_data = df_crm.groupby("LeadSource")["TotalSpent"].sum().reset_index()
@@ -490,6 +538,7 @@ with tabs[0]:
 
     st.markdown("---")
     
+    # VIP Enterprise Accounts & Churn Risks Grid
     grid_col1, grid_col2 = st.columns(2)
     with grid_col1:
         st.subheader("🏆 Top 5 VIP Enterprise Accounts")
@@ -510,24 +559,22 @@ with tabs[0]:
         )
 
 # ------------------------------------------------------------------------------
-# TAB 2: AI CHAT ASSISTANT (HIGH VISIBILITY & CONTRAST)
+# TAB 2: AI CHAT ASSISTANT
 # ------------------------------------------------------------------------------
 with tabs[1]:
     if "messages" not in st.session_state or not st.session_state["messages"]:
         st.session_state["messages"] = [
             {
                 "role": "assistant", 
-                "content": f"💼 **CRM Intelligence Agent Ready.**\n\nConnected to `{FULL_TABLE_PATH}` with multi-model failover ladder. Type your question below or click any starter query from the sidebar to analyze spend, rank lead channels, or audit churn risks."
+                "content": f"💼 **CRM Intelligence Agent Ready.** Connected to `{FULL_TABLE_PATH}` with multi-model failover ladder. Ask me to run BigQuery SQL queries, compute spend averages, or assess churn risks!"
             }
         ]
 
-    # Render complete chat history
     for message in st.session_state["messages"]:
         avatar = "💼" if message["role"] == "assistant" else "👤"
         with st.chat_message(message["role"], avatar=avatar):
             st.markdown(message["content"])
 
-    # Handle preset prompt or chat input
     preset = st.session_state.pop("preset_prompt", None)
     user_input = st.chat_input("Ask CRM Assistant to analyze spend, find churn risks, or rank lead sources...") or preset
 
@@ -544,131 +591,65 @@ with tabs[1]:
         st.session_state["messages"].append({"role": "assistant", "content": response_text})
 
 # ------------------------------------------------------------------------------
-# TAB 3: CRM LEADS EXPLORER (SEARCH & FILTERS)
+# TAB 3: CRM LEADS EXPLORER
 # ------------------------------------------------------------------------------
 with tabs[2]:
     st.subheader(f"📋 CRM Dataset Explorer ({len(df_crm)} Active Records)")
     
-    col1, col2, col3 = st.columns([2, 1.5, 1.5])
+    col1, col2, col3 = st.columns(3)
     with col1:
-        search_query = st.text_input(
-            "🔍 Search Leads (Type name, email, country, or notes keywords):",
-            placeholder="e.g. Eleanor, California, Churn, Referral, Apex...",
-            key="lead_search_input"
-        )
+        search_query = st.text_input("🔍 Search Leads", placeholder="Filter by name, email, country, or notes...")
     with col2:
-        selected_channels = st.multiselect(
-            "Filter by Acquisition Channel:",
-            options=list(df_crm["LeadSource"].unique()),
-            default=[]
-        )
+        selected_channels = st.multiselect("Acquisition Channels", options=list(df_crm["LeadSource"].unique()))
     with col3:
-        min_spend_filter = st.slider(
-            "Minimum Spend Filter ($):",
-            min_value=0,
-            max_value=100000,
-            value=0,
-            step=5000
-        )
+        min_spend_filter = st.slider("Minimum Spend Filter ($)", 0, 100000, 0, step=5000)
 
-    # Filter logic
     filtered_df = df_crm.copy()
     if search_query:
-        sq = search_query.strip().lower()
+        sq = search_query.lower()
         filtered_df = filtered_df[
-            filtered_df["FirstName"].str.lower().str.contains(sq, na=False) |
-            filtered_df["LastName"].str.lower().str.contains(sq, na=False) |
-            filtered_df["Email"].str.lower().str.contains(sq, na=False) |
-            filtered_df["Country"].str.lower().str.contains(sq, na=False) |
-            filtered_df["City"].str.lower().str.contains(sq, na=False) |
-            filtered_df["Notes"].str.lower().str.contains(sq, na=False)
+            filtered_df["FirstName"].str.lower().str.contains(sq) |
+            filtered_df["LastName"].str.lower().str.contains(sq) |
+            filtered_df["Email"].str.lower().str.contains(sq) |
+            filtered_df["Country"].str.lower().str.contains(sq) |
+            filtered_df["Notes"].str.lower().str.contains(sq)
         ]
     if selected_channels:
         filtered_df = filtered_df[filtered_df["LeadSource"].isin(selected_channels)]
     if min_spend_filter > 0:
         filtered_df = filtered_df[filtered_df["TotalSpent"] >= min_spend_filter]
 
-    st.markdown(f"**Showing {len(filtered_df)} matching leads:**")
     st.dataframe(filtered_df, use_container_width=True, hide_index=True)
     
     csv_bytes = filtered_df.to_csv(index=False).encode('utf-8')
     st.download_button(
-        label="📥 Export Filtered Leads as CSV",
+        label="📥 Export Filtered Leads CSV",
         data=csv_bytes,
         file_name="crm_leads_export.csv",
         mime="text/csv"
     )
 
 # ------------------------------------------------------------------------------
-# TAB 4: BIGQUERY INTERACTIVE SQL TERMINAL WITH EXAMPLE PRESETS
+# TAB 4: BIGQUERY INTERACTIVE SQL TERMINAL
 # ------------------------------------------------------------------------------
 with tabs[3]:
     st.subheader("💻 BigQuery Interactive SQL Terminal")
     st.caption(f"Target dataset: `{FULL_TABLE_PATH}`")
     
-    # Preset Example Queries Dictionary
-    EXAMPLE_QUERIES = {
-        "📊 Revenue by Acquisition Channel & Average Spend": (
-            f"SELECT LeadSource, COUNT(*) as lead_count, SUM(TotalSpent) as total_revenue, AVG(TotalSpent) as avg_spend\n"
-            f"FROM {FULL_TABLE_PATH}\n"
-            f"GROUP BY LeadSource\n"
-            f"ORDER BY total_revenue DESC"
-        ),
-        "⚠️ Accounts Flagged with Churn or Risk Signals": (
-            f"SELECT CustomerID, FirstName, LastName, Email, TotalSpent, Notes\n"
-            f"FROM {FULL_TABLE_PATH}\n"
-            f"WHERE LOWER(Notes) LIKE '%churn%' OR LOWER(Notes) LIKE '%risk%' OR LOWER(Notes) LIKE '%cancellation%'\n"
-            f"ORDER BY TotalSpent DESC"
-        ),
-        "🏆 Top 10 Enterprise VIP Customers by Total Spend": (
-            f"SELECT CustomerID, FirstName, LastName, Email, Country, TotalSpent, LeadSource, SignupDate\n"
-            f"FROM {FULL_TABLE_PATH}\n"
-            f"ORDER BY TotalSpent DESC\n"
-            f"LIMIT 10"
-        ),
-        "🌍 Geographic Distribution & Spend by Country": (
-            f"SELECT Country, COUNT(*) as customer_count, SUM(TotalSpent) as country_revenue, AVG(TotalSpent) as avg_spend\n"
-            f"FROM {FULL_TABLE_PATH}\n"
-            f"GROUP BY Country\n"
-            f"ORDER BY country_revenue DESC"
-        ),
-        "📋 Complete Raw CRM Leads Dump": (
-            f"SELECT CustomerID, FirstName, LastName, Email, Phone, City, Country, SignupDate, TotalSpent, LeadSource\n"
-            f"FROM {FULL_TABLE_PATH}\n"
-            f"ORDER BY CustomerID ASC"
-        )
-    }
-
-    st.markdown("#### ⚡ Example SQL Queries (Click to Load):")
-    selected_example = st.selectbox(
-        "Choose an example SQL template:",
-        options=list(EXAMPLE_QUERIES.keys()),
-        index=0
-    )
-
-    active_query = EXAMPLE_QUERIES[selected_example]
+    default_query = f"SELECT LeadSource, COUNT(*) as leads, SUM(TotalSpent) as revenue, AVG(TotalSpent) as avg_spend FROM {FULL_TABLE_PATH} GROUP BY LeadSource ORDER BY revenue DESC"
+    sql_text = st.text_area("SQL Statement", value=default_query, height=120)
     
-    st.markdown("#### 📝 SQL Statement:")
-    sql_text = st.text_area(
-        label="SQL Statement Editor:",
-        value=active_query,
-        height=140,
-        key="sql_terminal_input"
-    )
-    
-    if st.button("▶️ Execute SQL Query", type="primary", use_container_width=False):
+    if st.button("▶️ Execute SQL Query", type="primary"):
         t0 = time.time()
         sql_out = run_bigquery_sql(sql_text)
         t_elapsed = round((time.time() - t0) * 1000, 1)
         
-        st.success(f"✅ Query executed successfully in {t_elapsed} ms")
+        st.success(f"Executed in {t_elapsed} ms")
         try:
             parsed = json.loads(sql_out)
             if isinstance(parsed, list) and len(parsed) > 0:
                 st.dataframe(pd.DataFrame(parsed), use_container_width=True, hide_index=True)
-            elif isinstance(parsed, list) and len(parsed) == 0:
-                st.info("Query returned 0 rows.")
             else:
-                st.code(sql_out, language="json")
+                st.code(sql_out)
         except Exception:
             st.code(sql_out)
