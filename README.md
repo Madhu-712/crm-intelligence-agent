@@ -3,6 +3,7 @@
 
 An enterprise-grade, autonomous CRM intelligence assistant built for sales leaders, data analysts, and strategy teams. This application enables users to query customer records, run complex SQL aggregations on BigQuery, and execute sandbox analytical scripts using natural language—all powered by Google Cloud and the Gemini 3 model engine.
 
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/04ce7abc-8c6f-47e3-b955-cefa6cbb44a3" />
 
 
 ## 🛑 Problem Statement
