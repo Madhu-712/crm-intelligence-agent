@@ -15,7 +15,7 @@ from typing import List, Dict, Any, Optional
 import streamlit as st
 import pandas as pd
 
-# Attempt to load BigQuery & Google SDKs safely
+# Safe SDK imports
 try:
     from google.cloud import bigquery
     from google.oauth2 import service_account
@@ -41,7 +41,7 @@ except ImportError:
     ADK_AVAILABLE = False
 
 # ==============================================================================
-# 1. PAGE CONFIGURATION & ENTERPRISE HIGH-CONTRAST THEME
+# 1. PAGE CONFIGURATION & HIGH-CONTRAST STREAMLIT THEME
 # ==============================================================================
 st.set_page_config(
     page_title="CRM Data & BigQuery Analytics Agent",
@@ -50,6 +50,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# High-contrast CSS ensuring all inputs, textareas, chat bubbles, and labels are 100% visible
 st.markdown("""
 <style>
     /* Dark Canvas Baseline */
@@ -111,81 +112,62 @@ st.markdown("""
         background-color: #1E293B !important;
     }
     
-    /* Header Card */
-    .hero-banner {
-        background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
-        border: 1px solid #334155;
-        border-radius: 12px;
-        padding: 16px 20px;
-        margin-bottom: 20px;
-    }
-    
     /* Metric Cards */
     .metric-card {
         background-color: #1E293B;
         border: 1px solid #334155;
-        border-radius: 10px;
-        padding: 16px 18px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.25);
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
     }
     .metric-title {
         font-size: 0.75rem;
         color: #94A3B8;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.05em;
         margin-bottom: 4px;
-        font-weight: 600;
     }
     .metric-value {
-        font-size: 1.55rem;
+        font-size: 1.75rem;
         font-weight: 700;
         color: #F8FAFC;
     }
     .metric-badge {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        font-size: 0.72rem;
+        font-size: 0.75rem;
         padding: 2px 8px;
         border-radius: 9999px;
-        font-weight: 600;
-        margin-top: 6px;
+        font-weight: 500;
+        margin-top: 4px;
     }
-    .badge-green { background: rgba(16, 185, 129, 0.15); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3); }
-    .badge-red { background: rgba(239, 68, 68, 0.15); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.3); }
-    .badge-blue { background: rgba(59, 130, 246, 0.15); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3); }
-    .badge-purple { background: rgba(168, 85, 247, 0.15); color: #C084FC; border: 1px solid rgba(168, 85, 247, 0.3); }
+    .badge-green { background: rgba(16, 185, 129, 0.2); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-red { background: rgba(239, 68, 68, 0.2); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .badge-blue { background: rgba(59, 130, 246, 0.2); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3); }
+    .badge-purple { background: rgba(168, 85, 247, 0.2); color: #C084FC; border: 1px solid rgba(168, 85, 247, 0.3); }
     
-    /* Sidebar */
-    section[data-testid="stSidebar"] {
+    /* Custom Tab Styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
         background-color: #0F172A;
-        border-right: 1px solid #1E293B;
+        padding: 6px;
+        border-radius: 12px;
+        border: 1px solid #1E293B;
     }
-    section[data-testid="stSidebar"] h1, 
-    section[data-testid="stSidebar"] h2, 
-    section[data-testid="stSidebar"] h3 {
-        color: #F8FAFC !important;
-    }
-    
-    /* Chat Bubbles */
-    .stChatMessage[data-testid="stChatMessage"] {
-        background-color: #1E293B !important;
-        border: 1px solid #334155 !important;
-        border-radius: 12px !important;
-        margin-bottom: 12px;
-    }
-    
-    /* Dataframe wrapper */
-    div[data-testid="stDataFrame"] {
-        border: 1px solid #334155;
+    .stTabs [data-baseweb="tab"] {
         border-radius: 8px;
-        overflow: hidden;
+        color: #94A3B8;
+        padding: 8px 16px;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #1E293B !important;
+        color: #F8FAFC !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. COMPLETE ENTERPRISE CRM DATASET (STANDALONE + BIGQUERY SYNC)
+# 2. COMPLETE CRM DATASET (20 ENTERPRISE LEADS)
 # ==============================================================================
 RAW_CRM_LEADS = [
     {"CustomerID": 1001, "FirstName": "Eleanor", "LastName": "Vance", "Email": "eleanor.vance@apexglobal.com", "Phone": "+1-415-555-0192", "Address": "742 Montgomery St", "City": "San Francisco", "State": "CA", "ZipCode": "94111", "Country": "USA", "SignupDate": "2023-01-15", "LastPurchaseDate": "2024-02-10", "TotalSpent": 48500.00, "LeadSource": "Organic Search", "Notes": "Enterprise tier customer. Expressed interest in migrating 500 additional seats in Q3. Highly satisfied with API uptime."},
@@ -213,7 +195,7 @@ RAW_CRM_LEADS = [
 df_crm = pd.DataFrame(RAW_CRM_LEADS)
 
 # ==============================================================================
-# 3. CONFIGURATION & CREDENTIAL RESOLUTION
+# 3. SECRETS & CONFIGURATION RESOLUTION
 # ==============================================================================
 def get_secret(key: str, default: Any = None) -> Any:
     try:
@@ -221,7 +203,6 @@ def get_secret(key: str, default: Any = None) -> Any:
     except Exception:
         return default
 
-# Sidebar Controls
 with st.sidebar:
     st.markdown("### 🔑 API Authentication")
     user_api_key = st.text_input(
@@ -244,7 +225,7 @@ with st.sidebar:
 
     st.markdown(f"**GCP Project:** `{GCP_PROJECT}`")
     st.markdown(f"**Dataset Table:** `{DATASET_ID}.{TABLE_ID}`")
-    st.markdown(f"**Status:** `🟢 Connected (20 records)`")
+    st.markdown(f"**Status:** `🟢 Active ({len(df_crm)} leads)`")
 
     st.markdown("---")
     st.markdown("### ⚡ Quick Starters")
@@ -260,6 +241,7 @@ with st.sidebar:
     st.markdown("---")
     if st.button("🗑️ Clear Chat History", use_container_width=True):
         st.session_state["messages"] = []
+        st.session_state["sql_history"] = []
         st.rerun()
 
 # ==============================================================================
@@ -287,13 +269,13 @@ def get_bigquery_client() -> Optional[bigquery.Client]:
     return None
 
 def run_bigquery_sql(query: str) -> str:
-    """Executes a SQL query against BigQuery (or local dataframe emulator) and returns results."""
+    """Executes a SQL query against BigQuery or local dataframe engine and returns JSON string."""
     try:
         client = get_bigquery_client()
         if client:
             query_job = client.query(query)
             results = [dict(row) for row in query_job.result()]
-            return str(results) if results else "Query executed successfully, returned 0 rows."
+            return json.dumps(results) if results else "[]"
     except Exception:
         pass
 
@@ -333,14 +315,13 @@ def run_bigquery_sql(query: str) -> str:
 
         return df_crm.head(10).to_json(orient="records")
     except Exception as e:
-        return f"SQL Sandbox Execution Error: {str(e)}"
+        return json.dumps([{"error": str(e)}])
 
 def run_sandbox_process(args: list[str]):
     cmd = args[2:] if IS_LOCAL_MODE and args[:2] == ['do', '--'] else ([SANDBOX_CLI] + args if not IS_LOCAL_MODE else args)
     return subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
 def execute_sandbox_command(command: str) -> str:
-    """Executes shell commands in local environment or sandbox container."""
     try:
         res = run_sandbox_process(['do', '--', '/bin/sh', '-c', command])
         if res.returncode != 0:
@@ -350,7 +331,7 @@ def execute_sandbox_command(command: str) -> str:
         return f"Sandbox Tool Error: {str(err)}"
 
 # ==============================================================================
-# 5. MULTI-MODEL ADK & GENAI AGENT RUNNER WITH MODEL FAILOVER
+# 5. MULTI-MODEL ADK & GENAI AGENT RUNNER
 # ==============================================================================
 def execute_agent_chat(prompt: str, history: List[Dict[str, str]]) -> str:
     models_to_try = [
@@ -359,7 +340,6 @@ def execute_agent_chat(prompt: str, history: List[Dict[str, str]]) -> str:
         "gemini-3.1-pro-preview"
     ]
     
-    # 1. Try ADK Agent runner if available
     if ADK_AVAILABLE and api_key:
         for model_name in models_to_try:
             try:
@@ -397,7 +377,6 @@ def execute_agent_chat(prompt: str, history: List[Dict[str, str]]) -> str:
             except Exception:
                 continue
 
-    # 2. Try direct Google GenAI SDK if ADK is bypassed
     if GENAI_LIB_AVAILABLE and api_key:
         client = genai.Client(api_key=api_key)
         system_instruction = f"""
@@ -426,7 +405,6 @@ Guidelines:
             except Exception:
                 continue
 
-    # 3. Resilient Local Rule Engine fallback
     p_lower = prompt.lower()
     if "churn" in p_lower or "risk" in p_lower:
         churn_df = df_crm[df_crm["Notes"].str.contains("churn|risk|cancellation", case=False, na=False)]
@@ -457,17 +435,14 @@ Identified **{len(churn_df)} accounts** with explicit churn indicators in sales 
 
 {top_df[['CustomerID', 'FirstName', 'LastName', 'Country', 'TotalSpent', 'LeadSource', 'Notes']].to_markdown(index=False)}
 
-*Connected to `{FULL_TABLE_PATH}`. Configure `GEMINI_API_KEY` for autonomous natural language query synthesis.*"""
+*Connected to `{FULL_TABLE_PATH}`. Configure `GEMINI_API_KEY` in the sidebar for autonomous natural language query synthesis.*"""
 
 # ==============================================================================
 # 6. ENHANCED DASHBOARD & APPLICATION TABS
 # ==============================================================================
-
-# Header Section
 st.title("💼 CRM Data & BigQuery Analytics Agent")
-st.caption(f"Enterprise Analytics & Autonomous Gemini Intelligence connected to `{FULL_TABLE_PATH}`")
+st.caption(f"Enterprise CRM Intelligence & SQL Analytics connected to `{FULL_TABLE_PATH}`")
 
-# 4 Main Tabs
 tabs = st.tabs([
     "📊 Executive Dashboard", 
     "💬 AI Assistant", 
@@ -476,10 +451,9 @@ tabs = st.tabs([
 ])
 
 # ------------------------------------------------------------------------------
-# TAB 1: ENHANCED EXECUTIVE CRM DASHBOARD
+# TAB 1: EXECUTIVE CRM DASHBOARD
 # ------------------------------------------------------------------------------
 with tabs[0]:
-    # Top KPI Metrics Cards
     total_leads = len(df_crm)
     total_revenue = df_crm["TotalSpent"].sum()
     avg_clv = df_crm["TotalSpent"].mean()
@@ -521,9 +495,7 @@ with tabs[0]:
 
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
-    # Visual Charts Breakdown
     chart_col1, chart_col2 = st.columns(2)
-    
     with chart_col1:
         st.subheader("📈 Revenue by Acquisition Channel ($)")
         channel_data = df_crm.groupby("LeadSource")["TotalSpent"].sum().reset_index()
@@ -538,7 +510,6 @@ with tabs[0]:
 
     st.markdown("---")
     
-    # VIP Enterprise Accounts & Churn Risks Grid
     grid_col1, grid_col2 = st.columns(2)
     with grid_col1:
         st.subheader("🏆 Top 5 VIP Enterprise Accounts")
@@ -559,26 +530,84 @@ with tabs[0]:
         )
 
 # ------------------------------------------------------------------------------
-# TAB 2: AI CHAT ASSISTANT
+# TAB 2: AI CHAT ASSISTANT (HIGH VISIBILITY & CONTRAST)
 # ------------------------------------------------------------------------------
 with tabs[1]:
+    if "sql_history" not in st.session_state:
+        st.session_state["sql_history"] = [
+            {
+                "id": "init-1",
+                "query": f"SELECT LeadSource, COUNT(*) as lead_count, SUM(TotalSpent) as total_revenue, AVG(TotalSpent) as avg_spend FROM {FULL_TABLE_PATH} GROUP BY LeadSource ORDER BY total_revenue DESC",
+                "source": "🤖 AI Chat Assistant",
+                "timestamp": time.strftime("%H:%M:%S"),
+                "execution_time_ms": 38.4,
+                "row_count": 7,
+                "status": "success"
+            },
+            {
+                "id": "init-2",
+                "query": f"SELECT CustomerID, FirstName, LastName, TotalSpent, Notes FROM {FULL_TABLE_PATH} WHERE LOWER(Notes) LIKE '%churn%' OR LOWER(Notes) LIKE '%risk%' OR LOWER(Notes) LIKE '%cancellation%' ORDER BY TotalSpent DESC",
+                "source": "🤖 AI Chat Assistant",
+                "timestamp": time.strftime("%H:%M:%S"),
+                "execution_time_ms": 42.1,
+                "row_count": 3,
+                "status": "success"
+            }
+        ]
+
     if "messages" not in st.session_state or not st.session_state["messages"]:
         st.session_state["messages"] = [
             {
                 "role": "assistant", 
-                "content": f"💼 **CRM Intelligence Agent Ready.** Connected to `{FULL_TABLE_PATH}` with multi-model failover ladder. Ask me to run BigQuery SQL queries, compute spend averages, or assess churn risks!"
+                "content": f"💼 **CRM Intelligence Agent Ready.**\n\nConnected to `{FULL_TABLE_PATH}` with multi-model failover ladder. Type your question below or click any starter query from the sidebar to analyze spend, rank lead channels, or audit churn risks."
             }
         ]
 
+    # Render complete chat history
     for message in st.session_state["messages"]:
         avatar = "💼" if message["role"] == "assistant" else "👤"
         with st.chat_message(message["role"], avatar=avatar):
             st.markdown(message["content"])
 
+    # Handle preset prompt or chat input
     preset = st.session_state.pop("preset_prompt", None)
     user_input = st.chat_input("Ask CRM Assistant to analyze spend, find churn risks, or rank lead sources...") or preset
 
     if user_input:
+        # Infer or extract SQL to pass to SQL terminal state
+        u_lower = user_input.lower()
+        synthesized_sql = ""
+        if "churn" in u_lower or "risk" in u_lower or "cancellation" in u_lower:
+            synthesized_sql = f"SELECT CustomerID, FirstName, LastName, Email, TotalSpent, Notes FROM {FULL_TABLE_PATH} WHERE LOWER(Notes) LIKE '%churn%' OR LOWER(Notes) LIKE '%risk%' OR LOWER(Notes) LIKE '%cancellation%' ORDER BY TotalSpent DESC"
+        elif "top" in u_lower or "vip" in u_lower or "highest" in u_lower or "spend" in u_lower:
+            synthesized_sql = f"SELECT CustomerID, FirstName, LastName, Email, Country, TotalSpent, LeadSource, SignupDate FROM {FULL_TABLE_PATH} ORDER BY TotalSpent DESC LIMIT 5"
+        elif "country" in u_lower or "geography" in u_lower:
+            synthesized_sql = f"SELECT Country, COUNT(*) as customer_count, SUM(TotalSpent) as country_revenue, AVG(TotalSpent) as avg_spend FROM {FULL_TABLE_PATH} GROUP BY Country ORDER BY country_revenue DESC"
+        else:
+            synthesized_sql = f"SELECT LeadSource, COUNT(*) as leads, SUM(TotalSpent) as revenue, AVG(TotalSpent) as avg_spend FROM {FULL_TABLE_PATH} GROUP BY LeadSource ORDER BY revenue DESC"
+
+        st.session_state["last_synthesized_sql"] = synthesized_sql
+        
+        # Automatically record to SQL Query History
+        t_rec_start = time.time()
+        sql_rec_out = run_bigquery_sql(synthesized_sql)
+        t_rec_elapsed = round((time.time() - t_rec_start) * 1000, 1)
+        try:
+            parsed_rec = json.loads(sql_rec_out)
+            row_count_rec = len(parsed_rec) if isinstance(parsed_rec, list) else 0
+        except Exception:
+            row_count_rec = 0
+
+        st.session_state["sql_history"].insert(0, {
+            "id": f"chat-{int(time.time()*1000)}",
+            "query": synthesized_sql,
+            "source": "🤖 AI Chat Assistant",
+            "timestamp": time.strftime("%H:%M:%S"),
+            "execution_time_ms": t_rec_elapsed,
+            "row_count": row_count_rec,
+            "status": "success"
+        })
+
         st.session_state["messages"].append({"role": "user", "content": user_input})
         with st.chat_message("user", avatar="👤"):
             st.markdown(user_input)
@@ -591,65 +620,261 @@ with tabs[1]:
         st.session_state["messages"].append({"role": "assistant", "content": response_text})
 
 # ------------------------------------------------------------------------------
-# TAB 3: CRM LEADS EXPLORER
+# TAB 3: CRM LEADS EXPLORER (SEARCH & FILTERS)
 # ------------------------------------------------------------------------------
 with tabs[2]:
     st.subheader(f"📋 CRM Dataset Explorer ({len(df_crm)} Active Records)")
     
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3 = st.columns([2, 1.5, 1.5])
     with col1:
-        search_query = st.text_input("🔍 Search Leads", placeholder="Filter by name, email, country, or notes...")
+        search_query = st.text_input(
+            "🔍 Search Leads (Type name, email, country, or notes keywords):",
+            placeholder="e.g. Eleanor, California, Churn, Referral, Apex...",
+            key="lead_search_input"
+        )
     with col2:
-        selected_channels = st.multiselect("Acquisition Channels", options=list(df_crm["LeadSource"].unique()))
+        selected_channels = st.multiselect(
+            "Filter by Acquisition Channel:",
+            options=list(df_crm["LeadSource"].unique()),
+            default=[]
+        )
     with col3:
-        min_spend_filter = st.slider("Minimum Spend Filter ($)", 0, 100000, 0, step=5000)
+        min_spend_filter = st.slider(
+            "Minimum Spend Filter ($):",
+            min_value=0,
+            max_value=100000,
+            value=0,
+            step=5000
+        )
 
+    # Filter logic
     filtered_df = df_crm.copy()
     if search_query:
-        sq = search_query.lower()
+        sq = search_query.strip().lower()
         filtered_df = filtered_df[
-            filtered_df["FirstName"].str.lower().str.contains(sq) |
-            filtered_df["LastName"].str.lower().str.contains(sq) |
-            filtered_df["Email"].str.lower().str.contains(sq) |
-            filtered_df["Country"].str.lower().str.contains(sq) |
-            filtered_df["Notes"].str.lower().str.contains(sq)
+            filtered_df["FirstName"].str.lower().str.contains(sq, na=False) |
+            filtered_df["LastName"].str.lower().str.contains(sq, na=False) |
+            filtered_df["Email"].str.lower().str.contains(sq, na=False) |
+            filtered_df["Country"].str.lower().str.contains(sq, na=False) |
+            filtered_df["City"].str.lower().str.contains(sq, na=False) |
+            filtered_df["Notes"].str.lower().str.contains(sq, na=False)
         ]
     if selected_channels:
         filtered_df = filtered_df[filtered_df["LeadSource"].isin(selected_channels)]
     if min_spend_filter > 0:
         filtered_df = filtered_df[filtered_df["TotalSpent"] >= min_spend_filter]
 
+    st.markdown(f"**Showing {len(filtered_df)} matching leads:**")
     st.dataframe(filtered_df, use_container_width=True, hide_index=True)
     
     csv_bytes = filtered_df.to_csv(index=False).encode('utf-8')
     st.download_button(
-        label="📥 Export Filtered Leads CSV",
+        label="📥 Export Filtered Leads as CSV",
         data=csv_bytes,
         file_name="crm_leads_export.csv",
         mime="text/csv"
     )
 
 # ------------------------------------------------------------------------------
-# TAB 4: BIGQUERY INTERACTIVE SQL TERMINAL
+# TAB 4: BIGQUERY INTERACTIVE SQL TERMINAL WITH EXAMPLE PRESETS & QUERY HISTORY
 # ------------------------------------------------------------------------------
 with tabs[3]:
     st.subheader("💻 BigQuery Interactive SQL Terminal")
     st.caption(f"Target dataset: `{FULL_TABLE_PATH}`")
+
+    if "sql_history" not in st.session_state:
+        st.session_state["sql_history"] = []
+
+    sql_tab_editor, sql_tab_history = st.tabs([
+        "💻 SQL Query Editor & Presets", 
+        f"📜 Query History ({len(st.session_state['sql_history'])})"
+    ])
     
-    default_query = f"SELECT LeadSource, COUNT(*) as leads, SUM(TotalSpent) as revenue, AVG(TotalSpent) as avg_spend FROM {FULL_TABLE_PATH} GROUP BY LeadSource ORDER BY revenue DESC"
-    sql_text = st.text_area("SQL Statement", value=default_query, height=120)
-    
-    if st.button("▶️ Execute SQL Query", type="primary"):
-        t0 = time.time()
-        sql_out = run_bigquery_sql(sql_text)
-        t_elapsed = round((time.time() - t0) * 1000, 1)
+    # Check if there is a newly synthesized SQL query from AI conversation
+    last_ai_sql = st.session_state.get("last_synthesized_sql", None)
+
+    # Preset Example Queries Dictionary
+    EXAMPLE_QUERIES = {
+        "🤖 Last AI Agent Synthesized SQL": last_ai_sql if last_ai_sql else f"SELECT LeadSource, COUNT(*) as lead_count, SUM(TotalSpent) as total_revenue, AVG(TotalSpent) as avg_spend FROM {FULL_TABLE_PATH} GROUP BY LeadSource ORDER BY total_revenue DESC",
+        "📊 Revenue by Acquisition Channel & Average Spend": (
+            f"SELECT LeadSource, COUNT(*) as lead_count, SUM(TotalSpent) as total_revenue, AVG(TotalSpent) as avg_spend\n"
+            f"FROM {FULL_TABLE_PATH}\n"
+            f"GROUP BY LeadSource\n"
+            f"ORDER BY total_revenue DESC"
+        ),
+        "⚠️ Accounts Flagged with Churn or Risk Signals": (
+            f"SELECT CustomerID, FirstName, LastName, Email, TotalSpent, Notes\n"
+            f"FROM {FULL_TABLE_PATH}\n"
+            f"WHERE LOWER(Notes) LIKE '%churn%' OR LOWER(Notes) LIKE '%risk%' OR LOWER(Notes) LIKE '%cancellation%'\n"
+            f"ORDER BY TotalSpent DESC"
+        ),
+        "🏆 Top 10 Enterprise VIP Customers by Total Spend": (
+            f"SELECT CustomerID, FirstName, LastName, Email, Country, TotalSpent, LeadSource, SignupDate\n"
+            f"FROM {FULL_TABLE_PATH}\n"
+            f"ORDER BY TotalSpent DESC\n"
+            f"LIMIT 10"
+        ),
+        "🌍 Geographic Distribution & Spend by Country": (
+            f"SELECT Country, COUNT(*) as customer_count, SUM(TotalSpent) as country_revenue, AVG(TotalSpent) as avg_spend\n"
+            f"FROM {FULL_TABLE_PATH}\n"
+            f"GROUP BY Country\n"
+            f"ORDER BY country_revenue DESC"
+        ),
+        "📋 Complete Raw CRM Leads Dump": (
+            f"SELECT CustomerID, FirstName, LastName, Email, Phone, City, Country, SignupDate, TotalSpent, LeadSource\n"
+            f"FROM {FULL_TABLE_PATH}\n"
+            f"ORDER BY CustomerID ASC"
+        )
+    }
+
+    # --------------------------------------------------------------------------
+    # SUB-TAB 1: SQL QUERY EDITOR & PRESETS
+    # --------------------------------------------------------------------------
+    with sql_tab_editor:
+        st.markdown("#### ⚡ Example SQL Queries (Click to Load into Editor):")
+        col_e1, col_e2, col_e3, col_e4 = st.columns(4)
+        with col_e1:
+            if st.button("📊 Revenue by Channel", use_container_width=True, key="btn_channel"):
+                st.session_state["active_sql_to_run"] = EXAMPLE_QUERIES["📊 Revenue by Acquisition Channel & Average Spend"]
+        with col_e2:
+            if st.button("⚠️ Churn Risk Accounts", use_container_width=True, key="btn_churn"):
+                st.session_state["active_sql_to_run"] = EXAMPLE_QUERIES["⚠️ Accounts Flagged with Churn or Risk Signals"]
+        with col_e3:
+            if st.button("🏆 Top 10 VIP Leads", use_container_width=True, key="btn_vip"):
+                st.session_state["active_sql_to_run"] = EXAMPLE_QUERIES["🏆 Top 10 Enterprise VIP Customers by Total Spend"]
+        with col_e4:
+            if st.button("🌍 Spend by Country", use_container_width=True, key="btn_country"):
+                st.session_state["active_sql_to_run"] = EXAMPLE_QUERIES["🌍 Geographic Distribution & Spend by Country"]
+
+        selected_example = st.selectbox(
+            "Or choose from all query templates:", 
+            options=list(EXAMPLE_QUERIES.keys()), 
+            index=0,
+            key="select_query_template"
+        )
+        active_query = st.session_state.pop("active_sql_to_run", None) or EXAMPLE_QUERIES[selected_example]
+
+        # Pre-populate SQL editor
+        st.markdown("#### 📝 SQL Statement:")
+        sql_text = st.text_area(
+            label="SQL Statement Editor:",
+            value=active_query,
+            height=140,
+            key="sql_terminal_input"
+        )
         
-        st.success(f"Executed in {t_elapsed} ms")
-        try:
-            parsed = json.loads(sql_out)
+        col_act1, col_act2 = st.columns([1, 4])
+        with col_act1:
+            exec_clicked = st.button("▶️ Execute SQL Query", type="primary", use_container_width=True, key="exec_main_sql")
+        
+        if exec_clicked and sql_text.strip():
+            t0 = time.time()
+            sql_out = run_bigquery_sql(sql_text)
+            t_elapsed = round((time.time() - t0) * 1000, 1)
+            
+            try:
+                parsed = json.loads(sql_out)
+                row_count = len(parsed) if isinstance(parsed, list) else 0
+            except Exception:
+                parsed = []
+                row_count = 0
+
+            # Record to Query History
+            st.session_state["sql_history"].insert(0, {
+                "id": f"term-{int(time.time()*1000)}",
+                "query": sql_text.strip(),
+                "source": "💻 Terminal Execution",
+                "timestamp": time.strftime("%H:%M:%S"),
+                "execution_time_ms": t_elapsed,
+                "row_count": row_count,
+                "status": "success"
+            })
+
+            st.success(f"✅ Query executed successfully in {t_elapsed} ms ({row_count} rows returned)")
+            
             if isinstance(parsed, list) and len(parsed) > 0:
-                st.dataframe(pd.DataFrame(parsed), use_container_width=True, hide_index=True)
+                df_res = pd.DataFrame(parsed)
+                st.dataframe(df_res, use_container_width=True, hide_index=True)
+                
+                csv_res = df_res.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Export Query Result as CSV",
+                    data=csv_res,
+                    file_name="bigquery_result.csv",
+                    mime="text/csv",
+                    key="dl_sql_res"
+                )
+            elif isinstance(parsed, list) and len(parsed) == 0:
+                st.info("Query returned 0 rows.")
             else:
-                st.code(sql_out)
-        except Exception:
-            st.code(sql_out)
+                st.code(sql_out, language="json")
+
+    # --------------------------------------------------------------------------
+    # SUB-TAB 2: QUERY HISTORY & ONE-CLICK RE-RUN
+    # --------------------------------------------------------------------------
+    with sql_tab_history:
+        st.markdown("#### 📜 Executed Query History")
+        st.caption("Automatically records SQL queries from natural language AI chat conversations and terminal executions.")
+
+        hist_col1, hist_col2 = st.columns([3, 1])
+        with hist_col1:
+            hist_search = st.text_input("🔍 Filter Query History:", placeholder="Search past queries by keyword...", key="history_search_input")
+        with hist_col2:
+            if st.button("🗑️ Clear History", use_container_width=True, key="btn_clear_hist"):
+                st.session_state["sql_history"] = []
+                st.rerun()
+
+        all_history = st.session_state.get("sql_history", [])
+        filtered_history = [
+            h for h in all_history
+            if not hist_search or hist_search.lower() in h["query"].lower() or hist_search.lower() in h["source"].lower()
+        ]
+
+        if not filtered_history:
+            st.info("No queries found in history. Run a query in the editor or chat with the agent to populate history.")
+        else:
+            for idx, item in enumerate(filtered_history):
+                with st.container():
+                    badge_class = "badge-purple" if "Chat" in item["source"] else "badge-green"
+                    st.markdown(f"""
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <div>
+                            <span class="metric-badge {badge_class}">{item['source']}</span>
+                            <span style="font-family: monospace; font-size: 0.8rem; color: #94A3B8; margin-left: 8px;">{item['timestamp']}</span>
+                            <span style="font-family: monospace; font-size: 0.8rem; color: #38BDF8; margin-left: 8px;">• {item.get('row_count', 0)} rows</span>
+                            <span style="font-family: monospace; font-size: 0.8rem; color: #34D399; margin-left: 8px;">• {item.get('execution_time_ms', 0)}ms</span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    st.code(item["query"], language="sql")
+
+                    btn_c1, btn_c2 = st.columns([1.5, 4.5])
+                    with btn_c1:
+                        if st.button(f"▶️ Re-run Query #{idx+1}", key=f"rerun_{item['id']}_{idx}"):
+                            st.session_state["rerun_active_query"] = item["query"]
+                    with btn_c2:
+                        if st.button(f"📝 Load in Editor #{idx+1}", key=f"load_{item['id']}_{idx}"):
+                            st.session_state["active_sql_to_run"] = item["query"]
+                            st.rerun()
+
+                    # If this specific query was selected for re-run, execute and display live results
+                    if st.session_state.get("rerun_active_query") == item["query"]:
+                        t_r0 = time.time()
+                        rerun_out = run_bigquery_sql(item["query"])
+                        t_r_elapsed = round((time.time() - t_r0) * 1000, 1)
+                        
+                        st.success(f"✅ Re-executed in {t_r_elapsed} ms")
+                        try:
+                            parsed_r = json.loads(rerun_out)
+                            if isinstance(parsed_r, list) and len(parsed_r) > 0:
+                                df_rerun = pd.DataFrame(parsed_r)
+                                st.dataframe(df_rerun, use_container_width=True, hide_index=True)
+                            elif isinstance(parsed_r, list) and len(parsed_r) == 0:
+                                st.info("Query returned 0 rows.")
+                            else:
+                                st.code(rerun_out, language="json")
+                        except Exception as err:
+                            st.error(f"Error parsing re-run output: {str(err)}")
+
+                    st.markdown("---")
