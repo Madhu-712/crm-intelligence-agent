@@ -54,17 +54,6 @@ CRM AGENTS addresses this gap by providing a unified operating layer for CRM ins
 ---
 
 ## 📸 Application Screenshot
-- Executive Dashboard: overview of KPI cards, revenue metrics, and customer risk indicators
-- AI Assistant: natural-language CRM query and recommendation panel
-- BigQuery SQL Terminal: SQL editor for CRM data exploration
-- CRM Lead Explorer: filtered customer list with export-ready CSV output
-- Pub/Sub Notification Panel: event-driven record processing and review workflow
-
-> Suggested folder: `docs/screenshots/`  
-> Example files: `dashboard-overview.png`, `ai-assistant.png`, `sql-terminal.png`
-
-
-```
 
 +-----------------------------------------------------------------------------------+
 | 🔑 API Authentication   |  💼 CRM Intelligence Agent Ready.                      |
@@ -80,15 +69,27 @@ CRM AGENTS addresses this gap by providing a unified operating layer for CRM ins
 |                        |  +----------------+-----------------+                     |
 +-----------------------------------------------------------------------------------+
 
-<img width="1470" height="1140" alt="Dashboard Overview" src="https://github.com/user-attachments/assets/7f070128-9555-4a82-84e9-a1611ddb9f31" />
 
-<img width="1470" height="1140" alt="AI assistant" src="https://github.com/user-attachments/assets/143d873a-d635-4aa6-a22d-d1663ce65fd9" />
+- Executive Dashboard: overview of KPI cards, revenue metrics, and customer risk indicators
 
+   <img width="1470" height="1140" alt="Dashboard Overview" src="https://github.com/user-attachments/assets/7f070128-9555-4a82-84e9-a1611ddb9f31" />
+
+
+- AI Assistant: natural-language CRM query and recommendation panel
+
+  <img width="1470" height="1140" alt="AI assistant" src="https://github.com/user-attachments/assets/143d873a-d635-4aa6-a22d-d1663ce65fd9" />
+  
+
+- BigQuery SQL Terminal: SQL editor for CRM data exploration
+
+  <img width="1470" height="1140" alt="BQ sql terminal" src="https://github.com/user-attachments/assets/093cdbea-5f08-494e-a431-574319be1409" />
+  
+
+- CRM Lead Explorer: filtered customer list with export-ready CSV output
+
+  
 <img width="1470" height="1140" alt="CRM data explorer" src="https://github.com/user-attachments/assets/03574d85-7b99-4832-921a-89c43d445132" />
-
-<img width="1470" height="1140" alt="BQ sql terminal" src="https://github.com/user-attachments/assets/093cdbea-5f08-494e-a431-574319be1409" />
-
-
+  
 
 
 ## 👤 User Personas
