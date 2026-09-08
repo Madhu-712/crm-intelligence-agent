@@ -80,20 +80,15 @@ CRM AGENTS addresses this gap by providing a unified operating layer for CRM ins
 |                        |  +----------------+-----------------+                     |
 +-----------------------------------------------------------------------------------+
 
-<img width="1470" height="1140" alt="Dashboard Overview" src="https://github.com/user-attachments/assets/cb167153-5466-41ba-a74a-50dcabdaf166" />
 
 
----
-<img width="1470" height="1140" alt="Dashboard Overview" src="https://github.com/user-attachments/assets/d12091ee-1827-4d7d-9036-4262d2686396" />
+<img width="1470" height="1140" alt="Dashboard Overview" src="https://github.com/user-attachments/assets/31564faa-0016-48f2-90a8-736a86f18cef" />
 
+<img width="1470" height="1140" alt="AI assistant" src="https://github.com/user-attachments/assets/21b3d592-c4e6-4716-81a4-e343dfd137d4" />
 
-<img width="1470" height="1140" alt="AI assistant" src="https://github.com/user-attachments/assets/af4e2d15-c5f1-4616-8ee6-87de9d6ba41d" />
+<img width="1470" height="1140" alt="CRM data explorer" src="https://github.com/user-attachments/assets/5e4ea244-a8eb-4be7-8058-3a71b40a6388" />
 
-
-<img width="1470" height="1140" alt="CRM data explorer" src="https://github.com/user-attachments/assets/00573c63-aa63-4023-9de6-02da93d90ceb" />
-
-
-<img width="1470" height="1140" alt="BQ sql terminal" src="https://github.com/user-attachments/assets/51214a4f-8509-4e6e-a9a9-52bf04909b50" />
+<img width="1470" height="1140" alt="BQ sql terminal" src="https://github.com/user-attachments/assets/74fd0e2d-0dfe-4f36-a6f0-8b413feeb164" />
 
 
 
