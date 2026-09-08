@@ -48,7 +48,7 @@ CRM AGENTS addresses this gap by providing a unified operating layer for CRM ins
 
 ## 🌐 Live Demo
 
-* **Web Application:** [https://your-app-name.streamlit.app](https://your-app-name.streamlit.app)
+* **Web Application:** https://crmapp675416709818-us-central1.streamlit.app/
 * **Video Walkthrough / Pitch:** [https://youtube.com/your-demo-video](https://youtube.com/your-demo-video)
 
 ---
