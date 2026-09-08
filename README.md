@@ -5,14 +5,32 @@ An enterprise-grade, autonomous CRM intelligence assistant built for sales leade
 
 <img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/04ce7abc-8c6f-47e3-b955-cefa6cbb44a3" />
 
+## Project Overview
+
+This application delivers a modern CRM dashboard that lets teams:
+
+- monitor account health and revenue performance
+- explore customer and lead records in near real time
+- query BigQuery datasets using SQL
+- use an AI assistant to ask business questions in natural language
+- receive event-driven notifications when new CRM records are inserted
+
+Built around a Google Cloud data stack and an AI-driven workflow, CRM AGENTS helps organizations move from raw CRM information to decisions that improve retention, pipeline conversion, and customer expansion.
+
 
 ## 🛑 Problem Statement
 
 Modern enterprise CRMs gather immense volumes of customer data, lead touchpoints, and transactional histories. However, extracting operational insights often presents major bottlenecks:
+- sales teams cannot quickly identify at-risk accounts
+- customer success teams lack early churn signals
+- revenue leaders work with stale reports instead of live intelligence
+- data analysts spend too much time preparing dashboards instead of deriving insights
 
 * **SQL & Technical Barriers:** Non-technical sales managers must rely on overworked data teams to write custom SQL queries for basic metrics like churn risk or segment performance.
 * **Unstructured Data Silos:** Critical context stored in unstructured sales notes, feedback forms, and support transcripts remains unused in traditional relational dashboards.
 * **Delayed Actionable Strategy:** Static analytics tools report *what* happened, but fail to deliver immediate, actionable next steps or automated script-based data manipulation.
+
+CRM AGENTS addresses this gap by providing a unified operating layer for CRM insights, AI analysis, and BigQuery-backed reporting.
 
 
 
@@ -23,6 +41,8 @@ Modern enterprise CRMs gather immense volumes of customer data, lead touchpoints
 * 🛠️ **Autonomous Tool Calling:** Powered by the Google Agent Development Kit (ADK), enabling the agent to dynamically route between native BigQuery execution and local sandbox Python environments.
 * ⚡ **Streamlit Enterprise UI:** Custom-themed, responsive dashboard supporting interactive session history, seamless API credential management, and quick environment resets.
 * 🛡️ **Resilient Model Failover & Auto-Retry:** Built-in exponential backoff for transient capacity spikes (`503 UNAVAILABLE`) and dynamic model failover to ensure maximum uptime.
+*  **CRM lead explorer** with filters and CSV export
+* **Pub/Sub**-driven alerting for new BigQuery insert notifications
 
 ---
 
@@ -34,6 +54,14 @@ Modern enterprise CRMs gather immense volumes of customer data, lead touchpoints
 ---
 
 ## 📸 Application Screenshot
+- Executive Dashboard: overview of KPI cards, revenue metrics, and customer risk indicators
+- AI Assistant: natural-language CRM query and recommendation panel
+- BigQuery SQL Terminal: SQL editor for CRM data exploration
+- CRM Lead Explorer: filtered customer list with export-ready CSV output
+- Pub/Sub Notification Panel: event-driven record processing and review workflow
+
+> Suggested folder: `docs/screenshots/`  
+> Example files: `dashboard-overview.png`, `ai-assistant.png`, `sql-terminal.png`
 
 
 ```
@@ -52,7 +80,8 @@ Modern enterprise CRMs gather immense volumes of customer data, lead touchpoints
 |                        |  +----------------+-----------------+                     |
 +-----------------------------------------------------------------------------------+
 
-```
+
+
 
 ---
 
@@ -71,33 +100,40 @@ Modern enterprise CRMs gather immense volumes of customer data, lead touchpoints
 
 ```
 
++---------------------------+
+| User Interface            |
+| Streamlit Web App         |
++------------+--------------+
+             |
+             v
++---------------------------+
+| CRM Analytics Layer       |
+| Python + Pandas + Logic   |
++------------+--------------+
+             |
+             v
++---------------------------+
+| AI Layer                  |
+| Gemini / Google GenAI     |
+| ADK Agent Tools           |
++------------+--------------+
+             |
+             v
++---------------------------+
+| Data Layer                |
+| BigQuery Table / Dataset  |
+| Pub/Sub Notifications     |
++---------------------------+
 ```
-             +-----------------------------------+
-             |        Streamlit Web UI           |
-             +-----------------------------------+
-                               |
-                               v
-             +-----------------------------------+
-             |    ADK Agent (Gemini 3 Engine)    |
-             +-----------------------------------+
-               /                               \
-              /                                 \
-             v                                   v
 
-```
+The architecture combines:
 
-+-----------------------------+     +-----------------------------+
-|    Function Tool: BigQuery   |     |    Function Tool: Sandbox   |
-|   `run_bigquery_sql()`      |     | `execute_sandbox_command()` |
-+-----------------------------+     +-----------------------------+
-|                                   |
-v                                   v
-+-----------------------------+     +-----------------------------+
-|    Google Cloud BigQuery    |     |   Local / Isolated Python   |
-|     (`crm_data.leads`)      |     |       Runtime Environment   |
-+-----------------------------+     +-----------------------------+
+- a front-end dashboard for business users
+- a Python analytics engine for aggregations and transformations
+- a Google Cloud data layer for scalable CRM data storage and querying
+- AI-driven reasoning to answer natural language questions and recommend next steps
 
-```
+
 
 ---
 
@@ -142,10 +178,28 @@ cd crm-intelligence-agent
 
 ### 2. Set Up Virtual Environment & Install Dependencies
 
+#### 1. Environment Setup
+
 ```bash
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python -m venv .venv
+source .venv/bin/activate   # Linux/macOS
+.venv\Scripts\activate      # Windows
 pip install -r requirements.txt
+```
+
+#### 2. Configure Cloud Secrets
+
+Set the following environment variables or store them in Streamlit secrets:
+
+```bash
+export GOOGLE_CLOUD_PROJECT="your-project-id"
+export GOOGLE_CLOUD_LOCATION="us-central1"
+export GEMINI_API_KEY="your-gemini-key"
+export BIGQUERY_PROJECT_ID="your-project-id"
+export BIGQUERY_DATASET_ID="crm_dataset"
+export BIGQUERY_TABLE_ID="crm_leads"
+export PUBSUB_SUBSCRIPTION="projects/your-project/subscriptions/your-subscription"
+
 
 ```
 
@@ -172,10 +226,17 @@ BQ_TABLE=leads
 
 ```bash
 streamlit run app.py
+OR
+streamlit run app.py --server.port 8503 --server.address 0.0.0.0 --server.headless true --server.enableCORS false --server.enableXsrfProtection false
 
 ```
+Once running, the app provides five areas:
 
----
+1. Executive Dashboard
+2. AI Assistant
+3. CRM Leads Explorer
+4. BigQuery SQL Terminal
+5. Pub/Sub Notifications
 
 ## 🗺️ Feature Roadmap
 
@@ -183,6 +244,13 @@ streamlit run app.py
 * [ ] **Phase 2: Visualizations** — Auto-generation of interactive Plotly/Altair charts directly from SQL query outputs.
 * [ ] **Phase 3: Multi-Agent Collaboration** — Specialized sub-agents for dedicated Lead Scoring, Automated Email Drafting, and Predictive Churn Analytics.
 * [ ] **Phase 4: Write-back Capabilities** — Controlled CRM update pipelines allowing authorized users to update lead statuses via natural language commands.
+* [ ] **Phase 5:  CRM integrations** with Salesforce, HubSpot, and Zoho
+* [ ] **Phase 6: Summary** automated weekly executive summaries
+* [ ] **Phase 7: role-based access control** for sales and leadership teams
+* [ ] **Phase 8: expansion**into multi-region analytics and enterprise data governance
+* [ ] **Phase 9: smarter autonomous agents** for lead qualification and opportunity scoring
+
+
 
 ---
 
@@ -198,10 +266,47 @@ Contributions, issues, and feature requests are welcome!
 
 ---
 
-## 📜 License
+## Why CRM AGENTS
 
-Distributed under the MIT License. See `LICENSE` for more information.
+CRM AGENTS exists to make customer intelligence more actionable, accessible, and scalable. Instead of waiting for monthly reports or manual spreadsheet reviews, teams can use an AI-enhanced CRM experience to:
+
+- react faster to risk
+- prioritize high-value opportunities
+- unify business metrics with technical data access
+- improve visibility across the full customer lifecycle
+
+It is designed for organizations that need both operational clarity and strategic foresight.
+
+
+## LICENSE
+
+MIT License
+
+Copyright (c) 2026 CRM AGENTS
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+CRM AGENTS is built for smarter customer operations, stronger retention, and faster revenue decision-making.
+
 
 ```
 
-```
+
