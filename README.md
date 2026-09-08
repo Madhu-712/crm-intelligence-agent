@@ -80,6 +80,9 @@ CRM AGENTS addresses this gap by providing a unified operating layer for CRM ins
 |                        |  +----------------+-----------------+                     |
 +-----------------------------------------------------------------------------------+
 
+<img width="1470" height="1140" alt="Dashboard Overview" src="https://github.com/user-attachments/assets/cb167153-5466-41ba-a74a-50dcabdaf166" />
+
+
 ---
 <img width="1470" height="1140" alt="Dashboard Overview" src="https://github.com/user-attachments/assets/d12091ee-1827-4d7d-9036-4262d2686396" />
 
