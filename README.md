@@ -82,19 +82,17 @@ CRM AGENTS addresses this gap by providing a unified operating layer for CRM ins
 
 ---
 <img width="1470" height="1140" alt="Dashboard Overview" src="https://github.com/user-attachments/assets/d12091ee-1827-4d7d-9036-4262d2686396" />
----
----
+
+
 <img width="1470" height="1140" alt="AI assistant" src="https://github.com/user-attachments/assets/af4e2d15-c5f1-4616-8ee6-87de9d6ba41d" />
----
----
+
+
 <img width="1470" height="1140" alt="CRM data explorer" src="https://github.com/user-attachments/assets/00573c63-aa63-4023-9de6-02da93d90ceb" />
----
----
+
+
 <img width="1470" height="1140" alt="BQ sql terminal" src="https://github.com/user-attachments/assets/51214a4f-8509-4e6e-a9a9-52bf04909b50" />
----
----
-<img width="1470" height="1140" alt="PubSub" src="https://github.com/user-attachments/assets/75289d67-f434-42d7-8791-5081843a324a" />
----
+
+
 
 
 ## 👤 User Personas
